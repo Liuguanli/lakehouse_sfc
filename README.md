@@ -1,0 +1,23 @@
+Scripts to run SQL workloads against **Delta**, **Hudi**, and **Iceberg** on Spark.
+
+## Layout
+- `lakehouse_op/` — Python runner(s) like `run_queries.py`
+- `workloads/` — SQL files using `{{tbl}}` placeholder
+- `scripts/` — setup helpers
+- `data/` *(ignored)* — datasets
+- `metastore_db/` *(ignored)* — local Spark metastore
+- `results_*.csv` — run outputs
+
+## Example (Delta baseline)
+```bash
+TS=$(date +%Y%m%d_%H%M%S)
+$SPARK_HOME/bin/spark-submit \
+  --packages io.delta:delta-spark_2.12:3.2.0 \
+  --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
+  --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
+  lakehouse_op/run_queries.py \
+  --engine delta \
+  --table "\$(pwd)/data/delta/delta_baseline" \
+  --queries_dir workloads \
+  --warmup --cache none --action count \
+  --output_csv "results_delta_baseline_\${TS}.csv"

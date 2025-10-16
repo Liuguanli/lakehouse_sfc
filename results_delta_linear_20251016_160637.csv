@@ -1,0 +1,5 @@
+engine,query,bytesRead,elapsedTime_s,executorRunTime_s,executorCpuTime_s
+delta,q1_filter.sql,63444,0.302,0.219,0.064
+delta,q2_date_range.sql,9407308,0.412,3.475,2.927
+delta,q3_group_by.sql,947066,0.452,4.673,2.786
+delta,q4_order_limit.sql,557585274,0.652,11.036,9.441

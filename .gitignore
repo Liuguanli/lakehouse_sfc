@@ -1,0 +1,13 @@
+/data/
+/metastore_db/
+
+
+Note.md
+
+.spark-warehouse/
+.lakehouse/
+tmp/
+__pycache__/
+*.pyc
+*.log
+EOF
