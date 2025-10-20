@@ -1,5 +1,0 @@
-engine,query,bytesRead,elapsedTime_s,executorRunTime_s,executorCpuTime_s
-iceberg,q1_filter.sql,0,0.167,0.002,0.003
-iceberg,q2_date_range.sql,8901424,0.256,0.477,0.459
-iceberg,q3_group_by.sql,1949186,0.286,3.055,2.556
-iceberg,q4_order_limit.sql,230211074,0.747,14.103,12.174

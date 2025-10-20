@@ -1,5 +1,9 @@
 # Iceberg
 
+source ~/.lakehouse/env
+
+TS=$(date +%Y%m%d_%H%M%S)
+
 $SPARK_HOME/bin/spark-submit \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
@@ -14,7 +18,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine iceberg \
   --table local.demo.events_iceberg_baseline \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -34,7 +38,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine iceberg \
   --table local.demo.events_iceberg_linear \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -54,7 +58,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine iceberg \
   --table local.demo.events_iceberg_zorder \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -76,7 +80,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine delta \
   --table "$(pwd)/data/delta/delta_baseline" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -95,7 +99,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine delta \
   --table "$(pwd)/data/delta/delta_linear" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -114,7 +118,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine delta \
   --table "$(pwd)/data/delta/delta_zorder" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -135,7 +139,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine hudi \
   --table "$(pwd)/data/hudi/hudi_no_layout" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -152,7 +156,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine hudi \
   --table "$(pwd)/data/hudi/hudi_linear" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -169,7 +173,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine hudi \
   --table "$(pwd)/data/hudi/hudi_zorder" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
@@ -186,7 +190,7 @@ $SPARK_HOME/bin/spark-submit \
   lakehouse_op/run_queries.py \
   --engine hudi \
   --table "$(pwd)/data/hudi/hudi_hilbert" \
-  --queries_dir workloads \
+  --queries_dir workloads/demo \
   --warmup \
   --cache none \
   --action count \
