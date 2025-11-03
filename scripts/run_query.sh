@@ -44,7 +44,7 @@ ICEBERG_CONF=(
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
   --conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog
   --conf spark.sql.catalog.local.type=hadoop
-  --conf spark.sql.catalog.local.warehouse="$(pwd)/data/iceberg_wh"
+  --conf spark.sql.catalog.local.warehouse="$(pwd)/data/tpch_16/iceberg_wh"
 )
 
 run_iceberg() {
@@ -65,9 +65,9 @@ run_iceberg() {
       # --output_log "${LOG_DIR}/results_iceberg_${layout}_${WORKLOAD_NAME}.log"
 }
 
-run_iceberg baseline
-run_iceberg linear
-run_iceberg zorder
+# run_iceberg baseline
+# run_iceberg linear
+# run_iceberg zorder
 
 # ---------- DELTA ----------
 DELTA_PKGS="io.delta:delta-spark_2.12:3.2.0"
@@ -80,9 +80,9 @@ run_delta() {
   local layout="$1"   # baseline | linear | zorder
   local table_path
   case "$layout" in
-    baseline) table_path="$(pwd)/data/delta/delta_baseline" ;;
-    linear)   table_path="$(pwd)/data/delta/delta_linear" ;;
-    zorder)   table_path="$(pwd)/data/delta/delta_zorder" ;;
+    baseline) table_path="$(pwd)/data/tpch_16/delta/delta_baseline" ;;
+    linear)   table_path="$(pwd)/data/tpch_16/delta/delta_linear" ;;
+    zorder)   table_path="$(pwd)/data/tpch_16/delta/delta_zorder" ;;
     *) echo "Unknown delta layout: $layout" >&2; exit 1 ;;
   esac
   "$SPARK_HOME/bin/spark-submit" \
@@ -109,7 +109,7 @@ HUDI_PKGS="org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.2"
 
 run_hudi() {
   local layout="$1"   # no_layout | linear | zorder | hilbert
-  local table_path="$(pwd)/data/hudi/hudi_${layout}"
+  local table_path="$(pwd)/data/tpch_16/hudi/hudi_${layout}"
   "$SPARK_HOME/bin/spark-submit" \
     --packages "$HUDI_PKGS" \
     "${COMMON_CONF[@]}" \
@@ -124,9 +124,9 @@ run_hudi() {
       # --output_log "${LOG_DIR}/results_hudi_${layout}_${WORKLOAD_NAME}.log"
 }
 
-run_hudi no_layout
-run_hudi linear
-run_hudi zorder
-run_hudi hilbert
+# run_hudi no_layout
+# run_hudi linear
+# run_hudi zorder
+# run_hudi hilbert
 
 echo "All done. Results are under: ${RESULTS_DIR}"

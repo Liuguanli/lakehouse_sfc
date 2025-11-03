@@ -5,7 +5,7 @@ set -euo pipefail
 # Config (override by env)
 # =======================
 : "${INPUT:=/datasets/tpch_16.parquet}"
-: "${WAREHOUSE:=./data/iceberg_wh}"          # HadoopCatalog warehouse
+: "${WAREHOUSE:=./data/tpch_16/iceberg_wh}"          # HadoopCatalog warehouse
 : "${NAMESPACE:=local.demo}"                 # catalog.namespace
 : "${BASE_NAME:=events_iceberg}"             # final table: ${NAMESPACE}.${BASE_NAME}_<suffix>
 

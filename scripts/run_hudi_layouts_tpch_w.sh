@@ -5,7 +5,7 @@ set -euo pipefail
 # Config (override by env)
 # =======================
 : "${INPUT:=/datasets/tpch_16.parquet}"
-: "${BASE_DIR:=./data/hudi}"
+: "${BASE_DIR:=./data/tpch_16/hudi}"
 
 # ===== Spark/Hudi defaults (override via env) =====
 : "${HUDI_PKG:=org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.2}"

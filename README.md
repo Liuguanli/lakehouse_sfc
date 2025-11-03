@@ -21,3 +21,8 @@ $SPARK_HOME/bin/spark-submit \
   --queries_dir workloads \
   --warmup --cache none --action count \
   --output_csv "results_delta_baseline_\${TS}.csv"
+```
+
+  ## References
+
+  https://docs.delta.io/optimizations-oss/#optimize-performance-with-file-management

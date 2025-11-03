@@ -4,7 +4,7 @@ set -euo pipefail
 # ========= Config (override via env) =========
 : "${DELTA_PKG:=io.delta:delta-spark_2.12:3.2.0}"
 : "${INPUT:=/datasets/tpch_16.parquet}"     # e.g. ../lakehouse-lab/data/parquet_src
-: "${OUT_BASE:=./data/delta}"               # e.g. /media/DATA/lakehouse
+: "${OUT_BASE:=./data/tpch_16/delta}"               # e.g. /media/DATA/lakehouse
 
 # TPC-H friendly defaults
 # NOTE: space- or comma-separated are both OK; we normalize below into arrays.
@@ -87,9 +87,9 @@ run_job () {
 run_job "baseline" "none" "delta_baseline"
 
 # 2) linear: pre-write sort + compact small files
-run_job "linear" "compact" "delta_linear"
+run_job "linear" "none" "delta_linear"
 
 # 3) zorder: post-write z-order + compact (both)
 # Make sure LAYOUT_COLS do NOT include partition columns; however, the Python
 # script will auto-prune partition cols for Z-Order if you forget.
-run_job "zorder" "both" "delta_zorder"
+run_job "zorder" "zorder" "delta_zorder"
