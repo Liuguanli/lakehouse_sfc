@@ -1,5 +1,11 @@
 Scripts to run SQL workloads against **Delta**, **Hudi**, and **Iceberg** on Spark.
 
+
+## Environmental Setup:
+```bash
+bash scripts/lakehouse_setup.sh --repair --use-sudo
+```
+
 ## Layout
 - `lakehouse_op/` — Python runner(s) like `run_queries.py`
 - `workloads/` — SQL files using `{{tbl}}` placeholder
