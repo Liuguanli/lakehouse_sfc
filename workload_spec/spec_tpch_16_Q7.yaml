@@ -1,0 +1,14 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: GBY_SHIPYEAR_HAVING_SUM_CNT
+    sql: |
+      SELECT year(l_shipdate) AS ship_year,
+            sum(l_extendedprice) AS sum_price,
+            count(*) AS cnt
+      FROM {{tbl}}
+      GROUP BY year(l_shipdate)
+      HAVING sum(l_extendedprice) >= :min_sum AND count(*) >= :min_cnt
+    params:
+      min_sum: {type: int, range: [0, 1000]}
+      min_cnt: {type: int, range: [1, 100]}

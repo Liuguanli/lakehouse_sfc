@@ -1,5 +1,0 @@
-engine,query,bytesRead,elapsedTime_s,executorRunTime_s,executorCpuTime_s
-hudi,q1_filter.sql,0,0.143,0.003,0.004
-hudi,q2_date_range.sql,44838448,1.089,17.683,14.227
-hudi,q3_group_by.sql,68622892,0.336,4.790,3.402
-hudi,q4_order_limit.sql,631319084,1.281,25.989,24.157

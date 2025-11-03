@@ -1,0 +1,16 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: QUANTITY_DISCOUNT_BOX_WIDE
+    sql: |
+      SELECT count(*) FROM {{tbl}}
+      WHERE l_quantity BETWEEN :q_lo AND :q_hi
+        AND l_discount BETWEEN :d_lo AND :d_hi
+    params:
+      q_lo: {type: int}
+      q_hi: {type: int, constraint: "q_hi >= q_lo"}
+      d_lo: {type: float}
+      d_hi: {type: float, constraint: "d_hi >= d_lo"}
+    interval_rules:
+      - {column: l_quantity, lo: q_lo, hi: q_hi, type: int, ratio_range: [0.10, 0.25], clip_to_domain: true}
+      - {column: l_discount, lo: d_lo, hi: d_hi, type: float, ratio_range: [0.0, 0.25], clip_to_domain: true}

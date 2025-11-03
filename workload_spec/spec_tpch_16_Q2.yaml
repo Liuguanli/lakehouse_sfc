@@ -1,0 +1,13 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: DATES_A_SINGLE_RANGE
+    sql: |
+      SELECT l_orderkey FROM {{tbl}}
+      WHERE l_shipdate BETWEEN DATE ':sd_lo' AND DATE ':sd_hi'
+    params:
+      sd_lo: {type: date}
+      sd_hi: {type: date, constraint: "sd_hi >= sd_lo"}
+
+    interval_rules:
+      - {column: l_shipdate, lo: sd_lo, hi: sd_hi, type: date, ratio_range: [0.05, 0.12], clip_to_domain: true}

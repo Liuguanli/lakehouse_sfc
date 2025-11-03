@@ -1,0 +1,16 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: DATES_IN_MULTI
+    sql: |
+      SELECT l_orderkey FROM {{tbl}}
+      WHERE l_shipdate IN (DATE ':sd1', DATE ':sd2', DATE ':sd3', DATE ':sd4', DATE ':sd5')
+    params:
+      sd1: {type: date, range: ['1992-01-02', '1998-12-01']}
+      sd2: {type: date, range: ['1992-01-02', '1998-12-01'], constraint: "sd2 != sd1"}
+      sd3: {type: date, range: ['1992-01-02', '1998-12-01'], constraint: "sd3 not in {sd1, sd2}"}
+      sd4: {type: date, range: ['1992-01-02', '1998-12-01'], constraint: "sd4 not in {sd1, sd2, sd3}"}
+      sd5: {type: date, range: ['1992-01-02', '1998-12-01'], constraint: "sd5 not in {sd1, sd2, sd3, sd4}"}
+
+  # interval_rules:
+  #   - {column: l_shipdate, lo: sd1, hi: sd5, type: date, ratio_range: [0.05, 0.12], clip_to_domain: true}

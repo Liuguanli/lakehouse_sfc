@@ -1,0 +1,33 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: DATES_A
+    sql: |
+      SELECT l_orderkey FROM {{tbl}}
+      WHERE l_shipdate    BETWEEN DATE ':sd_lo' AND DATE ':sd_hi'
+        AND l_receiptdate BETWEEN DATE ':rd_lo' AND DATE ':rd_hi'
+    params:
+      # Four parameters (two date ranges). Dates are ISO strings (YYYY-MM-DD).
+      sd_lo: {type: date}                                        # ship-date lower bound
+      sd_hi: {type: date, constraint: "sd_hi >= sd_lo"}          # ship-date upper bound ≥ lower bound
+
+      # Receipt-date range. Business-safe constraints keep receipt not earlier than ship.
+      rd_lo: {type: date, constraint: "rd_lo >= sd_lo"}          # receipt start ≥ ship start
+      rd_hi: {type: date, constraint: "rd_hi >= rd_lo and rd_hi >= sd_hi"}  # receipt end ≥ both starts/ship end
+
+    interval_rules:
+      # Each rule instructs the filler how to pick a [lo, hi] window from data bounds.
+      # ratio_range: pick a random width between 5% and 12% of the full column span, then
+      # place that window uniformly within the span. Min/max are read from stats.yaml.
+      - {column: l_shipdate,    lo: sd_lo, hi: sd_hi, type: date, ratio_range: [0.05, 0.12]}
+      - column: l_receiptdate
+        lo: rd_lo
+        hi: rd_hi
+        type: date
+        align_with: {lo: sd_lo, hi: sd_hi}  # align receipt window to the ship window
+        ratio_range: [0.001, 0.01]
+        # width_scale: 1.0                    # use the same width as ship window
+        lag_days: [2, 30]                   # natural lead/lag range (adds variability)
+        max_start_gap_days: 14              # hard cap: rd_lo - sd_lo ≤ 14 days
+        max_end_gap_days: 21                # optional hard cap: rd_hi - sd_hi ≤ 21 days
+        clip_to_domain: true                # still clamp to column min/max from stats.yaml

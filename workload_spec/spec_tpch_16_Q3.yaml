@@ -1,0 +1,9 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: DATES_EQ_SINGLE
+    sql: |
+      SELECT l_orderkey FROM {{tbl}}
+      WHERE l_shipdate = DATE ':sd'
+    params:
+      sd: {type: date, range: ['1992-01-02', '1998-12-01']}

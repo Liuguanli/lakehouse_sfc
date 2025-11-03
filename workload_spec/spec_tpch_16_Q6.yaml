@@ -1,0 +1,16 @@
+generation: {n: 10, mode: random, seed: 42}
+
+templates:
+  - id: GBY_MODE_HAVING_COUNT
+    sql: |
+      SELECT l_shipmode, count(*) AS c
+      FROM {{tbl}}
+      WHERE l_shipdate BETWEEN DATE ':sd_lo' AND DATE ':sd_hi'
+      GROUP BY l_shipmode
+      HAVING count(*) >= :min_cnt
+    params:
+      sd_lo: {type: date}
+      sd_hi: {type: date, constraint: "sd_hi >= sd_lo"}
+      min_cnt: {type: int, range: [1, 100]}  
+    interval_rules:
+      - {column: l_shipdate, lo: sd_lo, hi: sd_hi, type: date, ratio_range: [0.05, 0.12], clip_to_domain: true}

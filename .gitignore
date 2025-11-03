@@ -1,13 +1,29 @@
 /data/
+/datasets/
+/log/
+/spark_eventlogs/
+/results/
 /metastore_db/
-
+/viz_out/
+/viz_out_results/
+/workloads/
+/tests/
 
 Note.md
 
-.spark-warehouse/
-.lakehouse/
+/spark-warehouse/
 tmp/
 __pycache__/
 *.pyc
 *.log
 EOF
+
+.venv/
+# wlg/
+
+stats.yaml
+workload.yaml
+examples/demo.sh
+
+Makefile
+pyproject.toml
