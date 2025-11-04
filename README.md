@@ -1,5 +1,6 @@
 Scripts to run SQL workloads against **Delta**, **Hudi**, and **Iceberg** on Spark.
 
+source ~/.lakehouse/env
 
 ## Environmental Setup:
 ```bash
