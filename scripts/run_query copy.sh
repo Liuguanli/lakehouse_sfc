@@ -1,48 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ============================================================
+source ~/.lakehouse/env
+
 # Usage:
-#   bash scripts/run_query.sh tpch_16 workloads/tpch_16_Q1
-#   # Run only specific engines:
-#   bash scripts/run_query.sh tpch_16 workloads/tpch_16_Q1 --delta --hudi
-#
-# Flags:
-#   --delta     Run Delta engine only
-#   --hudi      Run Hudi engine only
-#   --iceberg   Run Iceberg engine only
-#   (default)   Run all three engines if none specified
-# ============================================================
+#   ./run_all.sh                         # DATASET=tpch_16, SQL_DIR=workloads/tpch_16 (fallback to demo)
+#   ./run_all.sh tpch_16                 # same as above
+#   ./run_all.sh tpch_16 workloads/tpch_16_Q1
+#   ./run_all.sh tpch_4  workloads/tpch_4_Q1
 
-DATASET="${1:-}"
-WORKLOAD_DIR="${2:-}"
-shift 2 || true
+DATASET="${1:-tpch_16}"
+SQL_DIR_INPUT="${2:-}"
 
-RUN_DELTA=0
-RUN_HUDI=0
-RUN_ICEBERG=0
+# Optional environment file
+[[ -f ~/.lakehouse/env ]] && source ~/.lakehouse/env
 
-# ---------- Parse optional engine flags ----------
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --delta)   RUN_DELTA=1; shift;;
-    --hudi)    RUN_HUDI=1; shift;;
-    --iceberg) RUN_ICEBERG=1; shift;;
-    -h|--help)
-      sed -n '1,30p' "$0"; exit 0;;
-    *) echo "Unknown option: $1" >&2; exit 2;;
-  esac
-done
-
-# Default to all engines if none specified
-if [[ $RUN_DELTA -eq 0 && $RUN_HUDI -eq 0 && $RUN_ICEBERG -eq 0 ]]; then
-  RUN_DELTA=1; RUN_HUDI=1; RUN_ICEBERG=1
-fi
-
-# ---------- Environment setup ----------
-[[ -f "${HOME}/.lakehouse/env" ]] && source "${HOME}/.lakehouse/env"
-
-# Auto-detect SPARK_HOME if not set
+# Detect SPARK_HOME automatically if not set
 if [[ -z "${SPARK_HOME:-}" ]]; then
   if command -v spark-submit >/dev/null 2>&1; then
     export SPARK_HOME="$(dirname "$(dirname "$(command -v spark-submit)")")"
@@ -52,10 +25,12 @@ if [[ -z "${SPARK_HOME:-}" ]]; then
   fi
 fi
 
-# ---------- Validate input ----------
-if [[ -z "$DATASET" || -z "$WORKLOAD_DIR" ]]; then
-  echo "Usage: $0 <DATASET> <WORKLOAD_DIR> [--delta] [--hudi] [--iceberg]" >&2
-  exit 1
+# Resolve SQL (workload) directory
+if [[ -n "$SQL_DIR_INPUT" ]]; then
+  WORKLOAD_DIR="$SQL_DIR_INPUT"
+else
+  WORKLOAD_DIR="workloads/${DATASET}"
+  [[ -d "$WORKLOAD_DIR" ]] || WORKLOAD_DIR="workloads/demo"
 fi
 
 if [[ ! -d "$WORKLOAD_DIR" ]]; then
@@ -63,11 +38,11 @@ if [[ ! -d "$WORKLOAD_DIR" ]]; then
   exit 1
 fi
 
-# ---------- Define directories ----------
-ROOT="$(pwd)"
-ICEBERG_WH="${ROOT}/data/${DATASET}/iceberg_wh"
-HUDI_ROOT="${ROOT}/data/${DATASET}/hudi"
-DELTA_ROOT="${ROOT}/data/${DATASET}/delta"
+ICEBERG_WH="$(pwd)/data//${DATASET}/iceberg_wh"
+HUDI_ROOT="$(pwd)/data/${DATASET}/hudi"
+DELTA_ROOT="$(pwd)/data/${DATASET}/delta"
+
+
 
 WORKLOAD_NAME="$(basename "$WORKLOAD_DIR")"
 TS="$(date +%Y%m%d_%H%M%S)"
@@ -79,7 +54,7 @@ echo "DATASET     = $DATASET"
 echo "WORKLOAD_DIR= $WORKLOAD_DIR"
 echo "RESULTS_DIR = $RESULTS_DIR"
 
-# ---------- Common Spark configuration ----------
+# Common Spark configurations
 COMMON_CONF=(
   --conf spark.sql.shuffle.partitions=200
   --conf spark.sql.files.maxPartitionBytes=256m
@@ -88,9 +63,7 @@ COMMON_CONF=(
   --conf spark.executor.memoryOverhead=4g
 )
 
-# ============================================================
-# Iceberg Runner
-# ============================================================
+# ---------- Iceberg ----------
 ICEBERG_PKGS="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0"
 ICEBERG_CONF=(
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
@@ -99,7 +72,7 @@ ICEBERG_CONF=(
   --conf "spark.sql.catalog.local.warehouse=${ICEBERG_WH}"
 )
 
-run_iceberg() {
+run_iceberg () {
   local layout="$1"  # baseline | linear | zorder
   local table="local.demo.events_iceberg_${layout}"
   "$SPARK_HOME/bin/spark-submit" \
@@ -114,16 +87,14 @@ run_iceberg() {
       --output_csv "${RESULTS_DIR}/results_iceberg_${layout}_${WORKLOAD_NAME}.csv"
 }
 
-# ============================================================
-# Delta Runner
-# ============================================================
+# ---------- Delta ----------
 DELTA_PKGS="io.delta:delta-spark_2.12:3.2.0"
 DELTA_CONF=(
   --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
 )
 
-run_delta() {
+run_delta () {
   local layout="$1"  # baseline | linear | zorder
   local table_path
   case "$layout" in
@@ -144,12 +115,10 @@ run_delta() {
       --output_csv "${RESULTS_DIR}/results_delta_${layout}_${WORKLOAD_NAME}.csv"
 }
 
-# ============================================================
-# Hudi Runner
-# ============================================================
+# ---------- Hudi ----------
 HUDI_PKGS="org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.2"
 
-run_hudi() {
+run_hudi () {
   local layout="$1"  # no_layout | linear | zorder | hilbert
   local table_path="${HUDI_ROOT}/hudi_${layout}"
   "$SPARK_HOME/bin/spark-submit" \
@@ -163,29 +132,19 @@ run_hudi() {
       --output_csv "${RESULTS_DIR}/results_hudi_${layout}_${WORKLOAD_NAME}.csv"
 }
 
-# ============================================================
-# Execute Selected Engines
-# ============================================================
-if [[ $RUN_ICEBERG -eq 1 ]]; then
-  echo ">>> Running Iceberg queries"
-  run_iceberg baseline
-  run_iceberg linear
-  run_iceberg zorder
-fi
 
-if [[ $RUN_DELTA -eq 1 ]]; then
-  echo ">>> Running Delta queries"
-  run_delta baseline
-  run_delta linear
-  run_delta zorder
-fi
+# ---------- Execute All ----------
+run_iceberg baseline
+run_iceberg linear
+run_iceberg zorder
 
-if [[ $RUN_HUDI -eq 1 ]]; then
-  echo ">>> Running Hudi queries"
-  run_hudi no_layout
-  run_hudi linear
-  run_hudi zorder
-  run_hudi hilbert
-fi
+run_delta baseline
+run_delta linear
+run_delta zorder
 
-echo "✅ All executions complete → Results stored in: ${RESULTS_DIR}"
+run_hudi no_layout
+run_hudi linear
+run_hudi zorder
+run_hudi hilbert
+
+echo "All done -> ${RESULTS_DIR}"
