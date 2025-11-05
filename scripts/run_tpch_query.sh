@@ -122,7 +122,7 @@ fill_one_query() {
   # Optionally run the queries via the runner script
   if [[ -f "$RUNNER" ]]; then
     echo ">> Running workload: dataset=tpch_${s}, sql_dir=${sql_dir}"
-    bash "$RUNNER" "tpch_${s}" "$sql_dir"
+    bash "$RUNNER" "tpch_${s}" "$sql_dir" ${RUNNER_ARGS:-}
   else
     echo "[WARN] Runner not found: $RUNNER. Skipping execution."
   fi
