@@ -129,7 +129,28 @@ run_job () {
   echo "=== Done: ${out_dir} ==="
 }
 
-# ========= Execute All Layout Variants =========
-run_job "baseline" "none" "delta_baseline"
-run_job "linear"   "none" "delta_linear"
-run_job "zorder"   "zorder" "delta_zorder"
+# ========= Selective Delta layout runner =========
+# Normalize to a single layout token
+LAYOUT_RAW="${LAYOUTS:-}"
+LAYOUT_ONE="${LAYOUT_RAW%%,*}"
+LAYOUT_ONE="$(echo "$LAYOUT_ONE" | awk '{print $1}')"  # first word only
+LAYOUT_ONE="${LAYOUT_ONE,,}"
+
+# Map to the three variants; only the chosen one runs
+case "$LAYOUT_ONE" in
+  "")
+    echo "[INFO] No layout provided; nothing will run for Delta."
+    ;;
+  baseline)
+    run_job "baseline" "none"   "delta_baseline"
+    ;;
+  linear)
+    run_job "linear"   "none"   "delta_linear"
+    ;;
+  zorder|z-order)
+    run_job "zorder"   "zorder" "delta_zorder"
+    ;;
+  *)
+    echo "WARN: unknown Delta layout '$LAYOUT_ONE' (skipped)"
+    ;;
+esac

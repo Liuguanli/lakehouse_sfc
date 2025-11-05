@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ======================
+# Selective layout runner
+# Only execute layouts explicitly requested via --layouts or $LAYOUTS.
+# Accepted names: no_layout, zorder, hilbert, linear
+# ======================
+
+
+
 # =========================
 # Defaults (override by env)
 # =========================
@@ -180,9 +188,34 @@ run_job () {
 }
 
 # ======================
-# Run all variants
+# Selective layout runner
+# Only execute layouts explicitly requested via --layouts or $LAYOUTS.
+# Accepted names: no_layout, zorder, hilbert, linear
 # ======================
-# run_job false "default" "no_layout"
-# run_job true  "z-order" "zorder"
-# run_job true  "hilbert" "hilbert"
-run_job true  "linear"  "linear"
+# Normalize to a single layout token
+LAYOUT_RAW="${LAYOUTS:-}"                 # e.g., "linear"
+LAYOUT_ONE="${LAYOUT_RAW%%,*}"            # strip anything after a comma (just in case)
+LAYOUT_ONE="$(echo "$LAYOUT_ONE" | awk '{print $1}')"  # first word only
+LAYOUT_ONE="${LAYOUT_ONE,,}"              # lowercase
+
+# Run only when a valid single layout is provided
+case "$LAYOUT_ONE" in
+  "")
+    echo "[INFO] No layout provided; nothing will run for Hudi."
+    ;;
+  no_layout|default)
+    run_job false "default" "no_layout"
+    ;;
+  zorder|z-order)
+    run_job true  "z-order" "zorder"
+    ;;
+  hilbert)
+    run_job true  "hilbert" "hilbert"
+    ;;
+  linear)
+    run_job true  "linear"  "linear"
+    ;;
+  *)
+    echo "WARN: unknown Hudi layout '$LAYOUT_ONE' (skipped)"
+    ;;
+esac

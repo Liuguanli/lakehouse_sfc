@@ -132,47 +132,85 @@ safe_rm() {
 run_delta_for_scale() {
   local s="$1"
   local root="./data/tpch_${s}/delta"
+
+  # If --overwrite is set, wipe the target directory for a clean rebuild
   $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
+
   banner "Delta build for tpch_${s}"
-  # Pass LAYOUTS to sub-script; it should honor this (comma-separated)
-  LAYOUTS="${DELTA_LAYOUTS}" \
-  bash ./scripts/run_delta_layouts.sh \
-    --input "/datasets/tpch_${s}.parquet" \
-    --out-base "${root}" \
-    --partition-by "${PARTITION_BY}" \
-    --range-cols  "${RANGE_COLS}" \
-    --layout-cols "${LAYOUT_COLS}"
+
+  # Split comma-separated DELTA_LAYOUTS into an array and run each layout explicitly
+  IFS=',' read -r -a _layouts <<< "${DELTA_LAYOUTS}"
+  echo "[DELTA] layouts to build: ${_layouts[*]}"
+
+  for layout in "${_layouts[@]}"; do
+    echo "[DELTA] building layout=${layout} scale=${s}"
+
+    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
+    LAYOUTS="${layout}" \
+    bash ./scripts/run_delta_layouts.sh \
+      --input "/datasets/tpch_${s}.parquet" \
+      --out-base "${root}" \
+      --partition-by "${PARTITION_BY}" \
+      --range-cols  "${RANGE_COLS}" \
+      --layout-cols "${LAYOUT_COLS}"
+  done
 }
 
 run_hudi_for_scale() {
   local s="$1"
   local root="./data/tpch_${s}/hudi"
+
+  # If --overwrite is set, wipe the target directory for a clean rebuild
   $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
+
   banner "Hudi build for tpch_${s}"
-  LAYOUTS="${HUDI_LAYOUTS}" \
-  bash ./scripts/run_hudi_layouts.sh \
-    --input "/datasets/tpch_${s}.parquet" \
-    --base-dir "${root}" \
-    --record-key "l_orderkey,l_linenumber" \
-    --precombine-field "l_receiptdate" \
-    --partition-field "${PARTITION_BY}" \
-    --sort-columns "${LAYOUT_COLS}"
+
+  # Split comma-separated HUDI_LAYOUTS into an array and run each layout explicitly
+  IFS=',' read -r -a _layouts <<< "${HUDI_LAYOUTS}"
+  echo "[HUDI] layouts to build: ${_layouts[*]}"
+
+  for layout in "${_layouts[@]}"; do
+    echo "[HUDI] building layout=${layout} scale=${s}"
+
+    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
+    LAYOUTS="${layout}" \
+    bash ./scripts/run_hudi_layouts.sh \
+      --input "/datasets/tpch_${s}.parquet" \
+      --base-dir "${root}" \
+      --record-key "l_orderkey,l_linenumber" \
+      --precombine-field "l_receiptdate" \
+      --partition-field "${PARTITION_BY}" \
+      --sort-columns "${LAYOUT_COLS}"
+  done
 }
 
 run_iceberg_for_scale() {
   local s="$1"
   local wh="./data/tpch_${s}/iceberg_wh"
+
+  # If --overwrite is set, wipe the warehouse directory for a clean rebuild
   $OVERWRITE && { echo "[overwrite] removing ${wh}"; safe_rm "$wh"; }
+
   banner "Iceberg build for tpch_${s}"
-  LAYOUTS="${ICEBERG_LAYOUTS}" \
-  bash ./scripts/run_iceberg_layouts.sh \
-    --input "/datasets/tpch_${s}.parquet" \
-    --warehouse "${wh}" \
-    --namespace "${ICEBERG_NS}" \
-    --base-name "${ICEBERG_BASENAME}" \
-    --partition-by "${PARTITION_BY}" \
-    --range-cols  "${RANGE_COLS}" \
-    --layout-cols "${LAYOUT_COLS}"
+
+  # Split comma-separated ICEBERG_LAYOUTS into an array and run each layout explicitly
+  IFS=',' read -r -a _layouts <<< "${ICEBERG_LAYOUTS}"
+  echo "[ICEBERG] layouts to build: ${_layouts[*]}"
+
+  for layout in "${_layouts[@]}"; do
+    echo "[ICEBERG] building layout=${layout} scale=${s}"
+
+    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
+    LAYOUTS="${layout}" \
+    bash ./scripts/run_iceberg_layouts.sh \
+      --input "/datasets/tpch_${s}.parquet" \
+      --warehouse "${wh}" \
+      --namespace "${ICEBERG_NS}" \
+      --base-name "${ICEBERG_BASENAME}" \
+      --partition-by "${PARTITION_BY}" \
+      --range-cols  "${RANGE_COLS}" \
+      --layout-cols "${LAYOUT_COLS}"
+  done
 }
 
 # ---------- Main ----------
