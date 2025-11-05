@@ -47,6 +47,12 @@ ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
 ICEBERG_NS="${ICEBERG_NS:-local.demo}"
 ICEBERG_BASENAME="${ICEBERG_BASENAME:-events_iceberg}"
 
+# Script locations (resolved relative to this file)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DELTA_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_delta_layouts_tpch.sh"
+HUDI_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_hudi_layouts_tpch.sh"
+ICEBERG_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_iceberg_layouts_tpch.sh"
+
 # ---------- Helpers ----------
 die()  { echo "ERROR: $*" >&2; exit 1; }
 need() { [[ -f "$1" ]] || die "Missing script: $1"; }
@@ -117,9 +123,9 @@ if ! $ENG_DELTA && ! $ENG_HUDI && ! $ENG_ICEBERG; then
 fi
 
 # ---------- Sub-scripts check ----------
-$ENG_DELTA   && need "./scripts/run_delta_layouts.sh"
-$ENG_HUDI    && need "./scripts/run_hudi_layouts.sh"
-$ENG_ICEBERG && need "./scripts/run_iceberg_layouts.sh"
+$ENG_DELTA   && need "$DELTA_SPEC_SCRIPT"
+$ENG_HUDI    && need "$HUDI_SPEC_SCRIPT"
+$ENG_ICEBERG && need "$ICEBERG_SPEC_SCRIPT"
 
 # Safe delete helper: only under ./data/tpch_${s}/...
 safe_rm() {
@@ -129,88 +135,77 @@ safe_rm() {
 }
 
 # ---------- Engine runners ----------
-run_delta_for_scale() {
-  local s="$1"
-  local root="./data/tpch_${s}/delta"
+run_delta_engine() {
+  if $OVERWRITE; then
+    for s in "${SCALES_ARR[@]}"; do
+      local root="./data/tpch_${s}/delta"
+      echo "[overwrite] removing ${root}"
+      safe_rm "$root"
+    done
+  fi
 
-  # If --overwrite is set, wipe the target directory for a clean rebuild
-  $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
+  banner "Delta layouts (run_delta_layouts_tpch.sh)"
+  echo "[DELTA] scales : ${SCALES_ARR[*]}"
+  echo "[DELTA] layouts: ${DELTA_LAYOUTS}"
 
-  banner "Delta build for tpch_${s}"
+  local -a args=(--scales "${SCALES_ARR[*]}")
+  [[ -n "${PARTITION_BY:-}" ]] && args+=(--partition-by "${PARTITION_BY}")
+  [[ -n "${RANGE_COLS:-}"   ]] && args+=(--range-cols "${RANGE_COLS}")
+  [[ -n "${LAYOUT_COLS:-}"  ]] && args+=(--layout-cols "${LAYOUT_COLS}")
+  if [[ -n "${DELTA_LAYOUTS:-}" ]]; then
+    args+=(--layouts "${DELTA_LAYOUTS}")
+  fi
 
-  # Split comma-separated DELTA_LAYOUTS into an array and run each layout explicitly
-  IFS=',' read -r -a _layouts <<< "${DELTA_LAYOUTS}"
-  echo "[DELTA] layouts to build: ${_layouts[*]}"
-
-  for layout in "${_layouts[@]}"; do
-    echo "[DELTA] building layout=${layout} scale=${s}"
-
-    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
-    LAYOUTS="${layout}" \
-    bash ./scripts/run_delta_layouts.sh \
-      --input "/datasets/tpch_${s}.parquet" \
-      --out-base "${root}" \
-      --partition-by "${PARTITION_BY}" \
-      --range-cols  "${RANGE_COLS}" \
-      --layout-cols "${LAYOUT_COLS}"
-  done
+  bash "$DELTA_SPEC_SCRIPT" "${args[@]}"
 }
 
-run_hudi_for_scale() {
-  local s="$1"
-  local root="./data/tpch_${s}/hudi"
+run_hudi_engine() {
+  if $OVERWRITE; then
+    for s in "${SCALES_ARR[@]}"; do
+      local root="./data/tpch_${s}/hudi"
+      echo "[overwrite] removing ${root}"
+      safe_rm "$root"
+    done
+  fi
 
-  # If --overwrite is set, wipe the target directory for a clean rebuild
-  $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
+  banner "Hudi layouts (run_hudi_layouts_tpch.sh)"
+  echo "[HUDI] scales : ${SCALES_ARR[*]}"
+  echo "[HUDI] layouts: ${HUDI_LAYOUTS}"
 
-  banner "Hudi build for tpch_${s}"
+  local -a args=(--scales "${SCALES_ARR[*]}")
+  [[ -n "${PARTITION_BY:-}" ]] && args+=(--partition-field "${PARTITION_BY}")
+  [[ -n "${LAYOUT_COLS:-}"  ]] && args+=(--sort-columns "${LAYOUT_COLS}")
+  if [[ -n "${HUDI_LAYOUTS:-}" ]]; then
+    args+=(--layouts "${HUDI_LAYOUTS}")
+  fi
 
-  # Split comma-separated HUDI_LAYOUTS into an array and run each layout explicitly
-  IFS=',' read -r -a _layouts <<< "${HUDI_LAYOUTS}"
-  echo "[HUDI] layouts to build: ${_layouts[*]}"
-
-  for layout in "${_layouts[@]}"; do
-    echo "[HUDI] building layout=${layout} scale=${s}"
-
-    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
-    LAYOUTS="${layout}" \
-    bash ./scripts/run_hudi_layouts.sh \
-      --input "/datasets/tpch_${s}.parquet" \
-      --base-dir "${root}" \
-      --record-key "l_orderkey,l_linenumber" \
-      --precombine-field "l_receiptdate" \
-      --partition-field "${PARTITION_BY}" \
-      --sort-columns "${LAYOUT_COLS}"
-  done
+  bash "$HUDI_SPEC_SCRIPT" "${args[@]}"
 }
 
-run_iceberg_for_scale() {
-  local s="$1"
-  local wh="./data/tpch_${s}/iceberg_wh"
+run_iceberg_engine() {
+  if $OVERWRITE; then
+    for s in "${SCALES_ARR[@]}"; do
+      local wh="./data/tpch_${s}/iceberg_wh"
+      echo "[overwrite] removing ${wh}"
+      safe_rm "$wh"
+    done
+  fi
 
-  # If --overwrite is set, wipe the warehouse directory for a clean rebuild
-  $OVERWRITE && { echo "[overwrite] removing ${wh}"; safe_rm "$wh"; }
+  banner "Iceberg layouts (run_iceberg_layouts_tpch.sh)"
+  echo "[ICEBERG] scales : ${SCALES_ARR[*]}"
+  echo "[ICEBERG] layouts: ${ICEBERG_LAYOUTS}"
 
-  banner "Iceberg build for tpch_${s}"
+  local -a args=(--scales "${SCALES_ARR[*]}")
+  [[ -n "${ICEBERG_NS:-}"       ]] && args+=(--namespace "${ICEBERG_NS}")
+  [[ -n "${ICEBERG_BASENAME:-}" ]] && args+=(--base-name "${ICEBERG_BASENAME}")
+  [[ -n "${PARTITION_BY:-}"     ]] && args+=(--partition-by "${PARTITION_BY}")
+  [[ -n "${RANGE_COLS:-}"       ]] && args+=(--range-cols "${RANGE_COLS}")
+  [[ -n "${LAYOUT_COLS:-}"      ]] && args+=(--layout-cols "${LAYOUT_COLS}")
+  if [[ -n "${ICEBERG_LAYOUTS:-}" ]]; then
+    args+=(--layouts "${ICEBERG_LAYOUTS}")
+  fi
 
-  # Split comma-separated ICEBERG_LAYOUTS into an array and run each layout explicitly
-  IFS=',' read -r -a _layouts <<< "${ICEBERG_LAYOUTS}"
-  echo "[ICEBERG] layouts to build: ${_layouts[*]}"
-
-  for layout in "${_layouts[@]}"; do
-    echo "[ICEBERG] building layout=${layout} scale=${s}"
-
-    # Forward a single layout to the sub-script via LAYOUTS to force that layout only
-    LAYOUTS="${layout}" \
-    bash ./scripts/run_iceberg_layouts.sh \
-      --input "/datasets/tpch_${s}.parquet" \
-      --warehouse "${wh}" \
-      --namespace "${ICEBERG_NS}" \
-      --base-name "${ICEBERG_BASENAME}" \
-      --partition-by "${PARTITION_BY}" \
-      --range-cols  "${RANGE_COLS}" \
-      --layout-cols "${LAYOUT_COLS}"
-  done
+  bash "$ICEBERG_SPEC_SCRIPT" "${args[@]}"
 }
 
 # ---------- Main ----------
@@ -219,11 +214,9 @@ echo "Engines   : delta=${ENG_DELTA} hudi=${ENG_HUDI} iceberg=${ENG_ICEBERG} ove
 echo "Columns   : PARTITION_BY='${PARTITION_BY}' RANGE_COLS='${RANGE_COLS}' LAYOUT_COLS='${LAYOUT_COLS}'"
 echo "Layouts   : DELTA='${DELTA_LAYOUTS}' | HUDI='${HUDI_LAYOUTS}' | ICEBERG='${ICEBERG_LAYOUTS}'"
 
-for s in "${SCALES_ARR[@]}"; do
-  $ENG_DELTA   && run_delta_for_scale   "$s"
-  $ENG_HUDI    && run_hudi_for_scale    "$s"
-  $ENG_ICEBERG && run_iceberg_for_scale "$s"
-done
+$ENG_DELTA   && run_delta_engine
+$ENG_HUDI    && run_hudi_engine
+$ENG_ICEBERG && run_iceberg_engine
 
 echo
 echo "[DONE] Completed for scales: ${SCALES_ARR[*]}"
