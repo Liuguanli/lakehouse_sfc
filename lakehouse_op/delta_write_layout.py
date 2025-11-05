@@ -21,7 +21,7 @@ Tested with Delta 3.x on Spark 3.5.x.
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional, Iterable
+from typing import Iterable, List, Optional
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -30,6 +30,8 @@ try:
     from delta.tables import DeltaTable
 except Exception:
     DeltaTable = None
+
+from lakehouse_op.io_loader import load_input_df, parse_kv_options
 
 
 # ---------- path utilities (avoid relative path surprises) ----------
@@ -75,6 +77,19 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--input", required=True, help="Source Parquet directory (local/HDFS-compatible path)")
     p.add_argument("--output", required=True, help="Target Delta path-table directory")
+
+    p.add_argument(
+        "--input-format",
+        default="auto",
+        help="Input format for spark.read (e.g. parquet, csv, json). Defaults to auto-detect.",
+    )
+    p.add_argument(
+        "--input-option",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Additional spark.read options (repeatable, overrides defaults).",
+    )
 
     p.add_argument("--mode", default="overwrite", choices=["overwrite", "append"], help="Save mode")
     p.add_argument(
@@ -219,8 +234,8 @@ def main():
     output_path = abs_path(args.output)
     ensure_parent_dir(output_path)
 
-    # Read Parquet
-    df = spark.read.parquet(input_path)
+    input_options = parse_kv_options(args.input_option)
+    df = load_input_df(spark, input_path, fmt=args.input_format, options=input_options)
 
     # Validate columns (early, friendlier messages)
     _validate_columns(df.columns, args.partition_by, "partition-by")

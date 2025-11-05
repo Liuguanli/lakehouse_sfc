@@ -23,6 +23,8 @@ from pyspark.sql import SparkSession
 from pathlib import Path
 from urllib.parse import urlparse
 
+from lakehouse_op.io_loader import load_input_df, parse_kv_options
+
 def normalize_uri(p: str) -> str:
     """
     Convert any local path (relative or absolute) to an absolute file URI (file:///...).
@@ -71,6 +73,19 @@ def main():
     p.add_argument("--input", required=True, help="Source Parquet directory")
     p.add_argument("--table-path", required=True, help="Target Hudi table path")
     p.add_argument("--table-name", required=True, help="Target Hudi table name")
+
+    p.add_argument(
+        "--input-format",
+        default="auto",
+        help="spark.read format for the input (parquet/csv/..., default: auto detect).",
+    )
+    p.add_argument(
+        "--input-option",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Additional spark.read options (repeatable).",
+    )
 
     # Keys & partitioning (defaults for TPCH lineitem)
     p.add_argument("--record-key", default="l_orderkey,l_linenumber",
@@ -124,10 +139,11 @@ def main():
 
     args = p.parse_args()
 
+    input_options = parse_kv_options(args.input_option)
     spark = build_spark(args.app_name, args.shuffle_partitions)
 
-    # Read source
-    df = spark.read.format("parquet").load(args.input)
+    input_uri = normalize_uri(args.input)
+    df = load_input_df(spark, input_uri, fmt=args.input_format, options=input_options)
 
     # Cast common TPCH lineitem date columns – keeps types consistent for partitioning & filters
     from pyspark.sql import functions as F
@@ -201,11 +217,8 @@ def main():
         })
         options.pop("hoodie.clustering.layout.optimize.strategy", None)
 
-    input_uri = normalize_uri(args.input)
     table_uri = normalize_uri(args.table_path)
     ensure_local_parent(table_uri)
-
-    df = spark.read.format("parquet").load(input_uri)
 
     (
         df.write.format("hudi")

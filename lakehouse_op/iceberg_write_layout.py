@@ -27,6 +27,8 @@ from typing import Iterable, List
 
 from pyspark.sql import SparkSession, DataFrame, functions as F
 
+from lakehouse_op.io_loader import load_input_df, parse_kv_options
+
 
 def _abs_path(p: str) -> str:
     return os.path.abspath(os.path.expanduser(p))
@@ -89,6 +91,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--warehouse", required=True, help="HadoopCatalog warehouse directory")
     p.add_argument("--table-identifier", required=True, help="Iceberg table id, e.g., local.db.table")
 
+    p.add_argument(
+        "--input-format",
+        default="auto",
+        help="Input format for spark.read (parquet/csv/..., default: auto detect).",
+    )
+    p.add_argument(
+        "--input-option",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Additional spark.read options (repeatable).",
+    )
+
     p.add_argument("--mode", default="overwrite", choices=["overwrite", "append"], help="Write mode")
 
     p.add_argument("--partition-by", nargs="*", default=["l_returnflag", "l_linestatus"],
@@ -128,8 +143,8 @@ def main() -> int:
     input_path = _abs_path(args.input)
     table_id = args.table_identifier
 
-    # Read source
-    df = spark.read.parquet(input_path)
+    input_options = parse_kv_options(args.input_option)
+    df = load_input_df(spark, input_path, fmt=args.input_format, options=input_options)
 
     # Validate columns
     if args.partition_by:
