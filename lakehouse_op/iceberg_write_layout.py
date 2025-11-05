@@ -27,7 +27,7 @@ from typing import Iterable, List
 
 from pyspark.sql import SparkSession, DataFrame, functions as F
 
-from lakehouse_op.io_loader import load_input_df, parse_kv_options
+from io_loader import load_input_df, parse_kv_options
 
 
 def _abs_path(p: str) -> str:

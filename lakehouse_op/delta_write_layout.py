@@ -31,7 +31,7 @@ try:
 except Exception:
     DeltaTable = None
 
-from lakehouse_op.io_loader import load_input_df, parse_kv_options
+from io_loader import load_input_df, parse_kv_options
 
 
 # ---------- path utilities (avoid relative path surprises) ----------

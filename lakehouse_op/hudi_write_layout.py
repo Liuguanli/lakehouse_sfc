@@ -23,7 +23,7 @@ from pyspark.sql import SparkSession
 from pathlib import Path
 from urllib.parse import urlparse
 
-from lakehouse_op.io_loader import load_input_df, parse_kv_options
+from io_loader import load_input_df, parse_kv_options
 
 def normalize_uri(p: str) -> str:
     """

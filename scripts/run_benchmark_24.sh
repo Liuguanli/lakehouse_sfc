@@ -2,13 +2,15 @@
 
 bash ./scripts/lakehouse_setup.sh --repair
 
+source ~/.lakehouse/env
+
 # bash ./scripts/run_tpch_write.sh
 
 # bash scripts/run_tpch_write.sh # Overall
 # bash scripts/run_tpch_write.sh --scales "1 4 16" # 172.26.147.188
 # bash scripts/run_tpch_write.sh --engines delta,iceberg --scales "64" # 172.26.147.188
 bash scripts/run_tpch_write.sh --iceberg --scales "64"  # 172.26.146.47
-RUNNER_ARGS="--iceberg" bash run_tpch_query.sh 64
+# RUNNER_ARGS="--iceberg" bash scripts/run_tpch_query.sh 64
 # bash scripts/clean_data.sh --scales "64" --yes
 
 # RUNNER_ARGS="--delta --iceberg" bash run_tpch_query.sh 64
