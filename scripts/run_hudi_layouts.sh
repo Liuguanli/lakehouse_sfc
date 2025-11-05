@@ -182,7 +182,7 @@ run_job () {
 # ======================
 # Run all variants
 # ======================
-run_job false "default" "no_layout"
-run_job true  "z-order" "zorder"
-run_job true  "hilbert" "hilbert"
+# run_job false "default" "no_layout"
+# run_job true  "z-order" "zorder"
+# run_job true  "hilbert" "hilbert"
 run_job true  "linear"  "linear"

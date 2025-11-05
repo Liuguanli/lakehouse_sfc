@@ -107,7 +107,7 @@ fill_one_query() {
   mkdir -p "$sql_dir"
 
   # Skip regeneration if files already exist (unless FORCE=1)
-  if [[ "$FORCE" != "1" && -s "$yaml_out" && have_sql_files "$sql_dir" ]]; then
+  if [[ "${FORCE:-0}" != "1" && -s "$yaml_out" ]] && have_sql_files "$sql_dir"; then
     echo "[SKIP] Query Q${q} (scale ${s}) already exists: ${yaml_out}, ${sql_dir}"
   else
     echo ">> Generating Q${q} (scale ${s}) using spec: ${spec}"
