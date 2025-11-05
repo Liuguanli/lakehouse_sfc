@@ -19,7 +19,6 @@ bash scripts/run_tpch_write.sh --hudi --scales "64" --hudi-layouts hilbert,linea
 RUNNER_ARGS="--hudi --hudi-layouts hilbert,linear" bash ./scripts/run_tpch_query.sh 64
 bash scripts/clean_data.sh --scales "64" --yes
 
-
 # bash ./scripts/write_tpch.sh
 
 # bash scripts/run_tpch_write.sh # Overall
