@@ -34,6 +34,11 @@ TARGET_FILE_MB="${TARGET_FILE_MB:-128}"
 
 CORE_EXTRA_ARGS=()
 
+CORE_SUPPORTS_COL_FLAGS=false
+if bash "$CORE_SCRIPT" --help 2>/dev/null | grep -q -- '--partition-by'; then
+  CORE_SUPPORTS_COL_FLAGS=true
+fi
+
 usage() {
   cat <<'EOF'
 run_iceberg_layouts_tpch.sh
@@ -132,17 +137,37 @@ for scale in "${SCALES_ARR[@]}"; do
       continue
     fi
     echo "  -> layout=${layout_token} input=${input_path} warehouse=${warehouse_dir}"
-    LAYOUTS="$layout_token" \
-      bash "$CORE_SCRIPT" \
-        --input "$input_path" \
-        --warehouse "$warehouse_dir" \
-        --namespace "$NAMESPACE" \
-        --base-name "$BASE_NAME" \
-        --partition-by "$PARTITION_BY" \
-        --range-cols "$RANGE_COLS" \
-        --layout-cols "$LAYOUT_COLS" \
-        --shuffle "$SPARK_SHUF" \
-        --target-file-mb "$TARGET_FILE_MB" \
-        "${CORE_EXTRA_ARGS[@]}"
+    if $CORE_SUPPORTS_COL_FLAGS; then
+      LAYOUTS="$layout_token" \
+      PARTITION_BY="$PARTITION_BY" \
+      RANGE_COLS="$RANGE_COLS" \
+      LAYOUT_COLS="$LAYOUT_COLS" \
+      WAREHOUSE="$warehouse_dir" \
+        bash "$CORE_SCRIPT" \
+          --input "$input_path" \
+          --warehouse "$warehouse_dir" \
+          --namespace "$NAMESPACE" \
+          --base-name "$BASE_NAME" \
+          --partition-by "$PARTITION_BY" \
+          --range-cols "$RANGE_COLS" \
+          --layout-cols "$LAYOUT_COLS" \
+          --shuffle "$SPARK_SHUF" \
+          --target-file-mb "$TARGET_FILE_MB" \
+          "${CORE_EXTRA_ARGS[@]}"
+    else
+      LAYOUTS="$layout_token" \
+      PARTITION_BY="$PARTITION_BY" \
+      RANGE_COLS="$RANGE_COLS" \
+      LAYOUT_COLS="$LAYOUT_COLS" \
+      WAREHOUSE="$warehouse_dir" \
+        bash "$CORE_SCRIPT" \
+          --input "$input_path" \
+          --warehouse "$warehouse_dir" \
+          --namespace "$NAMESPACE" \
+          --base-name "$BASE_NAME" \
+          --shuffle "$SPARK_SHUF" \
+          --target-file-mb "$TARGET_FILE_MB" \
+          "${CORE_EXTRA_ARGS[@]}"
+    fi
   done
 done

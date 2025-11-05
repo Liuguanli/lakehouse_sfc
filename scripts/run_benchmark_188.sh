@@ -13,8 +13,8 @@ source ~/.lakehouse/env
 # bash scripts/run_tpch_write.sh --hudi --scales "64" --hudi-layouts hilbert,linear
 # RUNNER_ARGS="--hudi --hudi-layouts hilbert,linear" bash ./scripts/run_tpch_query.sh 64
 
-bash scripts/run_tpch_write.sh --iceberg --scales "64"
-# RUNNER_ARGS="--iceberg" bash scripts/run_tpch_query.sh 64
+# bash scripts/run_tpch_write.sh --iceberg --scales "64"
+RUNNER_ARGS="--iceberg" bash scripts/query_data_spec/run_tpch_query.sh 64
 # bash scripts/clean_data.sh --scales "64" --yes
 
 # bash scripts/run_tpch_write.sh --delta --scales "64"
