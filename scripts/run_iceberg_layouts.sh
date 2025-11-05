@@ -182,7 +182,7 @@ run_variant() {
   case "$1" in
     baseline) run_job "baseline" "none"  "baseline" ;;
     linear)   run_job "linear"   "sort"  "linear"   ;;
-    zorder)   run_job "zorder"   "both"  "zorder"   ;;
+    zorder)   run_job "zorder"   "zorder"  "zorder"   ;;
     *) echo "Unknown variant: $1" >&2; exit 2;;
   esac
 }
