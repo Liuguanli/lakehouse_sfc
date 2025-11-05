@@ -21,6 +21,7 @@ shift 2 || true
 RUN_DELTA=0
 RUN_HUDI=0
 RUN_ICEBERG=0
+HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
 
 # ---------- Parse optional engine flags ----------
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,8 @@ while [[ $# -gt 0 ]]; do
     --delta)   RUN_DELTA=1; shift;;
     --hudi)    RUN_HUDI=1; shift;;
     --iceberg) RUN_ICEBERG=1; shift;;
+    --hudi-layouts)          # NEW: comma-separated layouts
+      HUDI_LAYOUTS="$2"; shift 2;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0;;
     *) echo "Unknown option: $1" >&2; exit 2;;
@@ -180,12 +183,20 @@ if [[ $RUN_DELTA -eq 1 ]]; then
   run_delta zorder
 fi
 
+# if [[ $RUN_HUDI -eq 1 ]]; then
+#   echo ">>> Running Hudi queries"
+#   run_hudi no_layout
+#   run_hudi zorder
+#   run_hudi hilbert
+#   run_hudi linear
+# fi
+
 if [[ $RUN_HUDI -eq 1 ]]; then
   echo ">>> Running Hudi queries"
-  run_hudi no_layout
-  run_hudi linear
-  run_hudi zorder
-  run_hudi hilbert
+  IFS=',' read -r -a _hudi_layouts <<< "$HUDI_LAYOUTS"
+  for lay in "${_hudi_layouts[@]}"; do
+    run_hudi "$lay"
+  done
 fi
 
 echo "✅ All executions complete → Results stored in: ${RESULTS_DIR}"
