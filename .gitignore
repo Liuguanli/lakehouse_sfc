@@ -3,6 +3,8 @@
 /log/
 /spark_eventlogs/
 /results/
+/results_24/
+/results_188/
 /metastore_db/
 /viz_out/
 /viz_out_results/
