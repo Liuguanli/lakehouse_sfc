@@ -35,6 +35,9 @@ SPARK_HOME_OVERRIDE=""
 ICEBERG_CATALOG="tpchall"
 ICEBERG_NAMESPACE="tpch_all"
 ICEBERG_WAREHOUSE="./data/tpch_all/iceberg_wh"
+DRIVER_MEM="${TPCH_ALL_DRIVER_MEM:-96g}"
+EXEC_MEM="${TPCH_ALL_EXEC_MEM:-96g}"
+EXEC_OVH="${TPCH_ALL_EXEC_OVH:-32g}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -81,6 +84,9 @@ EXTRA_OVERWRITE=()
 
 set -x
 PYTHONPATH="$REPO_ROOT" "$SPARK_SUBMIT" \
+  --driver-memory "$DRIVER_MEM" \
+  --executor-memory "$EXEC_MEM" \
+  --conf "spark.executor.memoryOverhead=$EXEC_OVH" \
   --packages "$PKGS" \
   lakehouse_op/tpch_all_loader.py \
   --source "$SOURCE" \
