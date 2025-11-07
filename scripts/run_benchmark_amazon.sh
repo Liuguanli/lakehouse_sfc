@@ -10,8 +10,8 @@ HUDI_LAYOUTS_PHASE2="zorder,hilbert"
 ICEBERG_LAYOUTS="baseline,linear,zorder"
 
 
-# echo "===== Amazon write: Iceberg ====="
-# bash ./scripts/run_amazon_write.sh --iceberg --overwrite --iceberg-layouts "$ICEBERG_LAYOUTS"
+echo "===== Amazon write: Iceberg ====="
+bash ./scripts/run_amazon_write.sh --iceberg --overwrite --iceberg-layouts "$ICEBERG_LAYOUTS"
 echo "===== Amazon query: Iceberg ====="
 RUNNER_ARGS="--iceberg --iceberg-layouts $ICEBERG_LAYOUTS" \
   bash ./scripts/query_data_spec/run_amazon_query.sh --force
