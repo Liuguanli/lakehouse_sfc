@@ -70,20 +70,17 @@ PKGS="io.delta:delta-spark_2.12:3.2.0,org.apache.hudi:hudi-spark3.5-bundle_2.12:
 
 pushd "$REPO_ROOT" >/dev/null
 
-TABLE_ARG="$TABLES"
 if [[ "$TABLES" == "auto" ]]; then
-  TABLE_ARG="$(python - <<'PY'
-from tpch_all_schemas import TABLE_LIST
-print(",".join(TABLE_LIST))
-PY
-)"
+  TABLE_ARG="customer,orders,lineitem,supplier,nation,region,part,partsupp"
+else
+  TABLE_ARG="$TABLES"
 fi
 
 EXTRA_OVERWRITE=()
 [[ $OVERWRITE -eq 1 ]] && EXTRA_OVERWRITE=(--overwrite)
 
 set -x
-"$SPARK_SUBMIT" \
+PYTHONPATH="$REPO_ROOT" "$SPARK_SUBMIT" \
   --packages "$PKGS" \
   lakehouse_op/tpch_all_loader.py \
   --source "$SOURCE" \

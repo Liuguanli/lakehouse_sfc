@@ -18,8 +18,47 @@ from typing import Iterable, List
 
 from pyspark.sql import SparkSession
 
-import run_queries as rq
-from tpch_all_schemas import TABLE_LIST
+from lakehouse_op import run_queries as rq
+from lakehouse_op.tpch_all_schemas import TABLE_LIST
+
+
+def _split_sql_statements(sql_text: str) -> list[str]:
+    statements, buf = [], []
+    in_single = in_double = False
+    i, n = 0, len(sql_text)
+    while i < n:
+        ch = sql_text[i]
+        nxt = sql_text[i + 1] if i + 1 < n else ""
+        if ch == "-" and nxt == "-" and not in_single and not in_double:
+            # skip comment until newline
+            while i < n and sql_text[i] != "\n":
+                i += 1
+            i += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        if ch == ";" and not in_single and not in_double:
+            stmt = "".join(buf).strip()
+            if stmt:
+                statements.append(stmt)
+            buf = []
+        else:
+            buf.append(ch)
+        i += 1
+    tail = "".join(buf).strip()
+    if tail:
+        statements.append(tail)
+    return statements
+
+
+def _main_statement_index(statements: list[str]) -> int:
+    idx = -1
+    for i, stmt in enumerate(statements):
+        if stmt.lstrip().lower().startswith("select"):
+            idx = i
+    return idx if idx >= 0 else len(statements) - 1
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +76,8 @@ def parse_args() -> argparse.Namespace:
                     help="Optional timestamp suffix (default: generated).")
     ap.add_argument("--action", choices=["count", "collect", "show"], default="count",
                     help="Spark action to trigger for each query.")
+    ap.add_argument("--no-warmup", action="store_true",
+                    help="Disable warmup run before measuring metrics.")
     ap.add_argument("--rest-wait-ms", type=int, default=2000,
                     help="REST wait window for metrics.")
     ap.add_argument("--rest-poll-ms", type=int, default=250,
@@ -161,16 +202,36 @@ def main():
                     "executorRunTime_s_ev","executorCpuTime_s_ev",
                 ])
                 for qf in qfiles:
-                    sql_text = Path(qf).read_text(encoding="utf-8")
-                    group_id = f"{stream_dir.name}-{qf.name}-{time.time_ns()}"
-                    metrics = rq.run_one_query(
-                        spark,
-                        sql_text,
-                        group_id,
-                        args.action,
-                        args.rest_wait_ms,
-                        args.rest_poll_ms,
-                    )
+                    sql_text = Path(qf).read_text(encoding="utf-8").strip()
+                    statements = _split_sql_statements(sql_text)
+                    if not statements:
+                        continue
+                    main_idx = _main_statement_index(statements)
+                    metrics = None
+                    for idx, stmt in enumerate(statements):
+                        if idx == main_idx:
+                            if not args.no_warmup:
+                                rq.run_one_query(
+                                    spark,
+                                    stmt,
+                                    f"warmup-{stream_dir.name}-{qf.name}-{time.time_ns()}",
+                                    args.action,
+                                    args.rest_wait_ms,
+                                    args.rest_poll_ms,
+                                )
+                            group_id = f"{stream_dir.name}-{qf.name}-{time.time_ns()}"
+                            metrics = rq.run_one_query(
+                                spark,
+                                stmt,
+                                group_id,
+                                args.action,
+                                args.rest_wait_ms,
+                                args.rest_poll_ms,
+                            )
+                        else:
+                            spark.sql(stmt)
+                    if metrics is None:
+                        continue
                     writer.writerow([
                         args.engine,
                         stream_dir.name,

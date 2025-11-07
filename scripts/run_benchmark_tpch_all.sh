@@ -9,8 +9,8 @@ set -euo pipefail
 bash ./scripts/lakehouse_setup.sh --repair
 source ~/.lakehouse/env
 
-SOURCE_DIR="${SOURCE_DIR:-/datasets/tpch_1/data}"
-STREAMS_ROOT="${STREAMS_ROOT:-/datasets/tpch_1/workload}"
+SOURCE_DIR="${SOURCE_DIR:-/datasets/tpch_16/data}"
+STREAMS_ROOT="${STREAMS_ROOT:-/datasets/tpch_16/workload}"
 DATA_ROOT="${DATA_ROOT:-./data/tpch_all}"
 RESULTS_ROOT="${RESULTS_ROOT:-results/tpch_all}"
 ICEBERG_WH="${ICEBERG_WH:-${DATA_ROOT}/iceberg_wh}"

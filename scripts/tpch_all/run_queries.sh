@@ -41,6 +41,9 @@ TIMESTAMP=""
 ICEBERG_CATALOG="tpchall"
 ICEBERG_NAMESPACE="tpch_all"
 ICEBERG_WAREHOUSE="./data/tpch_all/iceberg_wh"
+DRIVER_MEM="${TPCH_ALL_DRIVER_MEM:-48g}"
+EXEC_MEM="${TPCH_ALL_EXEC_MEM:-48g}"
+EXEC_OVH="${TPCH_ALL_EXEC_OVH:-12g}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -83,7 +86,10 @@ for eng in ${ENGINES//,/ }; do
   eng_lc="$(echo "$eng" | tr '[:upper:]' '[:lower:]')"
   echo ">>> Running tpch_all queries for engine=${eng_lc}"
   set -x
-  "$SPARK_SUBMIT" \
+  PYTHONPATH="$REPO_ROOT" "$SPARK_SUBMIT" \
+    --driver-memory "$DRIVER_MEM" \
+    --executor-memory "$EXEC_MEM" \
+    --conf "spark.executor.memoryOverhead=$EXEC_OVH" \
     --packages "$PKGS" \
     lakehouse_op/tpch_all_runner.py \
       --engine "$eng_lc" \

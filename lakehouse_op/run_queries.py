@@ -696,9 +696,9 @@ def run_one_query(
         "bytes_scanned": int(bytes_scanned) / (1024 * 1024.0),
 
         # EVENTLOG path (distinguished with *_ev suffix)
-        "bytesRead_ev": int(ev.get("bytesRead_ev", 0) / (1024 * 1024.0) or 0),
+        "bytesRead_ev": ev.get("bytesRead_ev", 0) / (1024 * 1024.0) or 0,
         "files_scanned_ev": int(ev.get("files_scanned_ev", 0) or 0),
-        "bytes_scanned_ev": int(ev.get("bytes_scanned_ev", 0) / (1024 * 1024.0) or 0),
+        "bytes_scanned_ev": ev.get("bytes_scanned_ev", 0) / (1024 * 1024.0) or 0,
         "executorRunTime_s_ev": exec_run_s_ev,
         "executorCpuTime_s_ev": exec_cpu_s_ev,
     }

@@ -17,7 +17,7 @@ from typing import Dict, List
 
 from pyspark.sql import DataFrame, SparkSession
 
-from tpch_all_schemas import TPCH_TABLES, TABLE_LIST
+from lakehouse_op.tpch_all_schemas import TPCH_TABLES, TABLE_LIST
 
 
 def parse_args() -> argparse.Namespace:
