@@ -1,0 +1,23 @@
+generation: {n: 10, mode: random, seed: 73}
+
+templates:
+  - id: TOP_ASIN_AT_RATING
+    sql: |
+      SELECT asin,
+             COUNT(*) AS review_cnt,
+             AVG(helpful_vote) AS avg_helpful
+      FROM {{tbl}}
+      WHERE record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND verified_purchase = 'Y'
+        AND rating = :target_rating
+      GROUP BY asin
+      HAVING COUNT(*) >= :min_reviews
+      ORDER BY review_cnt DESC, avg_helpful DESC
+      LIMIT 100;
+    params:
+      ts_lo:         {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:         {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      target_rating: {type: int,  range: [1, 5]}
+      min_reviews:   {type: int,  range: [5, 100]}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.02, 0.08], clip_to_domain: true}

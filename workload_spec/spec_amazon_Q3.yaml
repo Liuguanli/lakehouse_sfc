@@ -1,0 +1,25 @@
+generation: {n: 10, mode: random, seed: 37}
+
+templates:
+  - id: EXTREME_RATING_USERS
+    sql: |
+      SELECT user_id,
+             COUNT(*) AS review_cnt,
+             SUM(helpful_vote) AS helpful_votes,
+             AVG(rating) AS avg_rating
+      FROM {{tbl}}
+      WHERE category = 'Beauty_and_Personal_Care'
+        AND record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND (rating <= :low_rating OR rating >= :high_rating)
+      GROUP BY user_id
+      HAVING COUNT(*) >= :min_reviews
+      ORDER BY helpful_votes DESC, review_cnt DESC
+      LIMIT 100;
+    params:
+      ts_lo: {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi: {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      low_rating:  {type: int, range: [1, 2]}
+      high_rating: {type: int, range: [4, 5], constraint: "high_rating > low_rating"}
+      min_reviews: {type: int, range: [3, 40]}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.03, 0.15], clip_to_domain: true}

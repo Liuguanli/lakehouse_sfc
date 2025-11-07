@@ -1,0 +1,21 @@
+generation: {n: 10, mode: random, seed: 83}
+
+templates:
+  - id: MONTHLY_RATING_IN
+    sql: |
+      SELECT DATE_TRUNC('month', record_timestamp) AS review_month,
+             COUNT(*) AS review_cnt,
+             AVG(helpful_vote) AS avg_helpful
+      FROM {{tbl}}
+      WHERE record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND rating IN (:rating_a, :rating_b, :rating_c)
+      GROUP BY review_month
+      ORDER BY review_month;
+    params:
+      ts_lo:    {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:    {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      rating_a: {type: int,  range: [1, 3]}
+      rating_b: {type: int,  range: [2, 5], constraint: "rating_b >= rating_a"}
+      rating_c: {type: int,  range: [3, 5], constraint: "rating_c >= rating_b"}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.08, 0.25], clip_to_domain: true}

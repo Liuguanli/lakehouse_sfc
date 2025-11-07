@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, List
 
 import pandas as pd
 
@@ -26,11 +26,46 @@ class CSVDataSource(DataSource):
         self._sample_rows = sample_rows
         self._batch_size = batch_size
         self._read_csv_kwargs = read_csv_kwargs
+        self._date_parse_explicit: List[str] = []
+        self._date_parse_infer: bool = True
+
+    def configure_date_parsing(self, explicit: List[str], infer: bool):
+        """Store date parsing preferences provided by the CLI."""
+        self._date_parse_explicit = explicit or []
+        self._date_parse_infer = infer
+
+    def _apply_date_parsing(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Parse/normalize date columns in-place based on config."""
+        if frame.empty:
+            return frame
+
+        # Parse explicitly requested columns
+        for col in self._date_parse_explicit:
+            if col in frame.columns:
+                parsed = pd.to_datetime(frame[col], errors="coerce")
+                frame[col] = parsed.dt.normalize()
+
+        # Optionally infer string/object columns that look like datetimes
+        if self._date_parse_infer:
+            for col in frame.columns:
+                if pd.api.types.is_datetime64_any_dtype(frame[col]):
+                    continue
+                if not (pd.api.types.is_object_dtype(frame[col]) or pd.api.types.is_string_dtype(frame[col])):
+                    continue
+                parsed = pd.to_datetime(frame[col], errors="coerce", infer_datetime_format=True)
+                if len(parsed) == 0:
+                    continue
+                # Require high success rate to avoid corrupting categorical columns
+                if parsed.notna().mean() >= 0.90:
+                    frame[col] = parsed.dt.normalize()
+
+        return frame
 
     def schema(self) -> Dict[str, str]:
         """Infer schema via a single-row read."""
 
-        df = pd.read_csv(self._path, nrows=1, **self._read_csv_kwargs)
+        df = pd.read_csv(self._path, nrows=min(self._batch_size, 1024), **self._read_csv_kwargs)
+        df = self._apply_date_parsing(df)
         return {col: str(dtype) for col, dtype in df.dtypes.items()}
 
     def scan_batches(self) -> Iterable[pd.DataFrame]:
@@ -47,6 +82,8 @@ class CSVDataSource(DataSource):
         )
         yielded = 0
         for frame in iterator:
+            frame = self._apply_date_parsing(frame)
+
             if self._sample_rows is None:
                 yield frame
                 continue

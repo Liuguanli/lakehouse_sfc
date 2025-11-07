@@ -1,0 +1,24 @@
+generation: {n: 10, mode: random, seed: 51}
+
+templates:
+  - id: BOOKS_PRODUCT_QUALITY
+    sql: |
+      SELECT asin,
+             AVG(rating) AS avg_rating,
+             SUM(helpful_vote) AS helpful_votes,
+             COUNT(*) AS review_cnt
+      FROM {{tbl}}
+      WHERE category = 'Books'
+        AND record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND verified_purchase = 'Y'
+      GROUP BY asin
+      HAVING COUNT(*) BETWEEN :min_reviews AND :max_reviews
+      ORDER BY helpful_votes DESC
+      LIMIT 100;
+    params:
+      ts_lo: {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi: {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      min_reviews: {type: int, range: [5, 50]}
+      max_reviews: {type: int, range: [20, 200], constraint: "max_reviews >= min_reviews"}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.04, 0.16], clip_to_domain: true}

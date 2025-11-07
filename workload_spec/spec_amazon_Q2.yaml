@@ -1,0 +1,24 @@
+generation: {n: 10, mode: random, seed: 31}
+
+templates:
+  - id: ELECTRONICS_MONTHLY_TREND
+    sql: |
+      SELECT DATE_TRUNC('month', record_timestamp) AS review_month,
+             COUNT(*) AS review_cnt,
+             AVG(rating) AS avg_rating,
+             SUM(helpful_vote) AS helpful_votes
+      FROM {{tbl}}
+      WHERE category = 'Electronics'
+        AND record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND rating BETWEEN :rating_lo AND :rating_hi
+      GROUP BY review_month
+      HAVING COUNT(*) >= :min_reviews
+      ORDER BY review_month;
+    params:
+      ts_lo:  {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:  {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      rating_lo: {type: int, range: [1, 4]}
+      rating_hi: {type: int, range: [2, 5], constraint: "rating_hi >= rating_lo"}
+      min_reviews: {type: int, range: [10, 500]}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.04, 0.18], clip_to_domain: true}

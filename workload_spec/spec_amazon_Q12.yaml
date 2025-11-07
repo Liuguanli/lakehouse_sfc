@@ -1,0 +1,26 @@
+generation: {n: 10, mode: random, seed: 97}
+
+templates:
+  - id: DAILY_ACTIVE_WINDOW
+    sql: |
+      SELECT DATE(record_timestamp) AS review_day,
+             COUNT(*) AS review_cnt,
+             AVG(rating) AS avg_rating,
+             SUM(helpful_vote) AS helpful_votes
+      FROM {{tbl}}
+      WHERE record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND helpful_vote >= :hv_min
+        AND rating BETWEEN :rating_lo AND :rating_hi
+      GROUP BY DATE(record_timestamp)
+      HAVING COUNT(*) >= :min_daily
+      ORDER BY review_day
+      LIMIT 60;
+    params:
+      ts_lo:     {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:     {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      rating_lo: {type: int,  range: [1, 4]}
+      rating_hi: {type: int,  range: [2, 5], constraint: "rating_hi >= rating_lo"}
+      hv_min:    {type: int,  range: [0, 200]}
+      min_daily: {type: int,  range: [5, 200]}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.01, 0.05], clip_to_domain: true}

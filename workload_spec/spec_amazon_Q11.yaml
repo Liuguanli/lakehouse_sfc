@@ -1,0 +1,22 @@
+generation: {n: 10, mode: random, seed: 89}
+
+templates:
+  - id: HELPFUL_BUCKET_RATIO
+    sql: |
+      SELECT
+        SUM(CASE WHEN helpful_vote BETWEEN :hv_lo AND :hv_hi THEN 1 ELSE 0 END) AS bucket_hits,
+        COUNT(*) AS total_reviews,
+        SUM(helpful_vote) AS total_helpful
+      FROM {{tbl}}
+      WHERE record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND verified_purchase = 'Y'
+        AND rating >= :rating_min;
+    params:
+      ts_lo:     {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:     {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      rating_min:{type: int,  range: [1, 4]}
+      hv_lo:     {type: int,  range: [0, 150]}
+      hv_hi:     {type: int,  range: [20, 400], constraint: "hv_hi >= hv_lo"}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.02, 0.10], clip_to_domain: true}
+      - {column: helpful_vote,    lo: hv_lo, hi: hv_hi, type: int,  ratio_range: [0.05, 0.25], clip_to_domain: true}

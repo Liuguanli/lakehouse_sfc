@@ -22,6 +22,8 @@ RUN_DELTA=0
 RUN_HUDI=0
 RUN_ICEBERG=0
 HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
+DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
+ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
 
 # ---------- Parse optional engine flags ----------
 while [[ $# -gt 0 ]]; do
@@ -31,6 +33,10 @@ while [[ $# -gt 0 ]]; do
     --iceberg) RUN_ICEBERG=1; shift;;
     --hudi-layouts)          # NEW: comma-separated layouts
       HUDI_LAYOUTS="$2"; shift 2;;
+    --delta-layouts)
+      DELTA_LAYOUTS="$2"; shift 2;;
+    --iceberg-layouts)
+      ICEBERG_LAYOUTS="$2"; shift 2;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0;;
     *) echo "Unknown option: $1" >&2; exit 2;;
@@ -169,19 +175,20 @@ run_hudi() {
 # ============================================================
 # Execute Selected Engines
 # ============================================================
-if [[ $RUN_ICEBERG -eq 1 ]]; then
-  echo ">>> Running Iceberg queries"
-  run_iceberg baseline
-  run_iceberg linear
-  run_iceberg zorder
-fi
 
-if [[ $RUN_DELTA -eq 1 ]]; then
-  echo ">>> Running Delta queries"
-  run_delta baseline
-  run_delta linear
-  run_delta zorder
-fi
+# if [[ $RUN_ICEBERG -eq 1 ]]; then
+#   echo ">>> Running Iceberg queries"
+#   run_iceberg baseline
+#   run_iceberg linear
+#   run_iceberg zorder
+# fi
+
+# if [[ $RUN_DELTA -eq 1 ]]; then
+#   echo ">>> Running Delta queries"
+#   run_delta baseline
+#   run_delta linear
+#   run_delta zorder
+# fi
 
 # if [[ $RUN_HUDI -eq 1 ]]; then
 #   echo ">>> Running Hudi queries"
@@ -190,6 +197,22 @@ fi
 #   run_hudi hilbert
 #   run_hudi linear
 # fi
+
+if [[ $RUN_ICEBERG -eq 1 ]]; then
+  echo ">>> Running Iceberg queries"
+  IFS=',' read -r -a _iceberg_layouts <<< "$ICEBERG_LAYOUTS"
+  for lay in "${_iceberg_layouts[@]}"; do
+    run_iceberg "$lay"
+  done
+fi
+
+if [[ $RUN_DELTA -eq 1 ]]; then
+  echo ">>> Running Delta queries"
+  IFS=',' read -r -a _delta_layouts <<< "$DELTA_LAYOUTS"
+  for lay in "${_delta_layouts[@]}"; do
+    run_delta "$lay"
+  done
+fi
 
 if [[ $RUN_HUDI -eq 1 ]]; then
   echo ">>> Running Hudi queries"
@@ -200,3 +223,19 @@ if [[ $RUN_HUDI -eq 1 ]]; then
 fi
 
 echo "✅ All executions complete → Results stored in: ${RESULTS_DIR}"
+
+# ---------- Final mirror (copy contents into FINAL, overwrite same names) ----------
+FINAL_BASE="results/${WORKLOAD_NAME}/final"
+FINAL_DIR="${FINAL_BASE}/${TS}"
+mkdir -p "$FINAL_DIR"
+
+if command -v rsync >/dev/null 2>&1; then
+  # Mirror contents; overwrite changed files; remove stale files in FINAL
+  rsync -a --checksum --inplace --delete "${RESULTS_DIR}/" "$FINAL_DIR/"
+else
+  # Fallback: copy contents (including dotfiles); always overwrite
+  cp -af "${RESULTS_DIR}/." "$FINAL_DIR/"
+fi
+
+ln -sfn "$FINAL_DIR" "${FINAL_BASE}/latest"
+echo "📎 Mirrored full results to: ${FINAL_DIR} (and updated ${FINAL_BASE}/latest)"

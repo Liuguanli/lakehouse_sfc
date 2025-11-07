@@ -1,0 +1,22 @@
+generation: {n: 10, mode: random, seed: 24}
+
+templates:
+  - id: CATEGORY_TIME_RATING_DISTRIBUTION
+    sql: |
+      SELECT category,
+             COUNT(*) AS review_cnt,
+             AVG(rating) AS avg_rating,
+             SUM(helpful_vote) AS total_helpful_votes
+      FROM {{tbl}}
+      WHERE category IN ('All_Beauty', 'Electronics', 'Books')
+        AND record_timestamp BETWEEN TIMESTAMP ':ts_lo' AND TIMESTAMP ':ts_hi'
+        AND rating BETWEEN :rating_lo AND :rating_hi
+      GROUP BY category
+      ORDER BY total_helpful_votes DESC;
+    params:
+      ts_lo:  {type: date, range: ['2018-01-01', '2023-12-31']}
+      ts_hi:  {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
+      rating_lo: {type: int, range: [1, 4]}
+      rating_hi: {type: int, range: [2, 5], constraint: "rating_hi >= rating_lo"}
+    interval_rules:
+      - {column: record_timestamp, lo: ts_lo, hi: ts_hi, type: date, ratio_range: [0.05, 0.20], clip_to_domain: true}

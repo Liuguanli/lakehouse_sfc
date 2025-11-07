@@ -25,14 +25,38 @@ OVERWRITE=false
 # Default input file (override via env INPUT)
 INPUT="${INPUT:-/datasets/amazon_review_all.csv}"
 
-# Column arguments (customize as needed)
-PARTITION_BY="${PARTITION_BY:-}"   # e.g., user_id,product_id
-RANGE_COLS="${RANGE_COLS:-}"       # e.g., review_date
-LAYOUT_COLS="${LAYOUT_COLS:-}"     # e.g., review_date,star_rating
+# record_timestamp, rating — current default, balancing temporal and quality dimensions
+
+# record_timestamp, asin — time + product identifier
+
+# category, record_timestamp — partition by category first, then sort by time
+
+# record_timestamp, helpful_vote — time + user engagement level
+
+# Column arguments with dataset-aware defaults
+PARTITION_BY="${PARTITION_BY:-category}"
+RANGE_COLS="${RANGE_COLS:-record_timestamp}"
+LAYOUT_COLS="${LAYOUT_COLS:-record_timestamp,rating}"
+
+# Per-engine layout defaults
+DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
+HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
+ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
 
 # Iceberg naming (overridable via env)
 ICEBERG_NS="${ICEBERG_NS:-local.demo}"
-ICEBERG_BASENAME="${ICEBERG_BASENAME:-reviews_iceberg}"
+ICEBERG_BASENAME="${ICEBERG_BASENAME:-events_iceberg}"
+
+# Script locations (resolved relative to this file)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DELTA_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_delta_layouts_amazon.sh"
+HUDI_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_hudi_layouts_amazon.sh"
+ICEBERG_SPEC_SCRIPT="${SCRIPT_DIR}/load_data_spec/run_iceberg_layouts_amazon.sh"
+
+DATA_ROOT="./data/amazon"
+DELTA_ROOT="${DATA_ROOT}/delta"
+HUDI_ROOT="${DATA_ROOT}/hudi"
+ICEBERG_WH="${DATA_ROOT}/iceberg_wh"
 
 # ----- Helpers -----
 die()   { echo "ERROR: $*" >&2; exit 1; }
@@ -45,6 +69,13 @@ run_reviews_write.sh
   --engines delta,hudi,iceberg   Comma-separated engines to run
   --delta | --hudi | --iceberg   Enable engine(s) individually
   --overwrite                    Remove target output dir before writing
+  --input PATH                   Override input CSV path
+  --partition-by COLS            Override partition columns
+  --range-cols COLS              Override range columns
+  --layout-cols COLS             Override layout/sort columns
+  --delta-layouts LIST           Override Delta layouts (comma-separated)
+  --hudi-layouts LIST            Override Hudi layouts
+  --iceberg-layouts LIST         Override Iceberg layouts
   -h|--help                      Show this help
 
 Environment overrides:
@@ -74,6 +105,13 @@ while [[ $# -gt 0 ]]; do
     --hudi)      ENG_HUDI=true;      shift ;;
     --iceberg)   ENG_ICEBERG=true;   shift ;;
     --overwrite) OVERWRITE=true;     shift ;;
+    --input)     INPUT="$2"; shift 2;;
+    --partition-by) PARTITION_BY="$2"; shift 2;;
+    --range-cols)   RANGE_COLS="$2"; shift 2;;
+    --layout-cols)  LAYOUT_COLS="$2"; shift 2;;
+    --delta-layouts)   DELTA_LAYOUTS="$2"; shift 2;;
+    --hudi-layouts)    HUDI_LAYOUTS="$2"; shift 2;;
+    --iceberg-layouts) ICEBERG_LAYOUTS="$2"; shift 2;;
     -h|--help)   print_help; exit 0 ;;
     *) die "Unknown arg: $1 (use --help)";;
   esac
@@ -85,61 +123,73 @@ if ! $ENG_DELTA && ! $ENG_HUDI && ! $ENG_ICEBERG; then
 fi
 
 # Ensure sub-scripts exist for selected engines
-$ENG_DELTA   && need "./scripts/run_delta_layouts.sh"
-$ENG_HUDI    && need "./scripts/run_hudi_layouts.sh"
-$ENG_ICEBERG && need "./scripts/run_iceberg_layouts.sh"
+$ENG_DELTA   && need "$DELTA_SPEC_SCRIPT"
+$ENG_HUDI    && need "$HUDI_SPEC_SCRIPT"
+$ENG_ICEBERG && need "$ICEBERG_SPEC_SCRIPT"
 
-# Safe delete helper: restrict deletions to ./data/reviews/*
+# Safe delete helper: restrict deletions to data/amazon/*
 safe_rm() {
   local path="$1"
-  [[ "$path" == ./data/reviews/* ]] || die "Refusing to delete outside ./data/reviews/: $path"
+  [[ "$path" == ${DATA_ROOT}/* ]] || die "Refusing to delete outside ${DATA_ROOT}/ : $path"
   rm -rf "$path"
 }
 
 # ----- Engine runners -----
 run_delta() {
-  local root="./data/reviews/delta"
-  $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
-  banner "Delta build for amazon_review_all.csv"
-  bash ./scripts/run_delta_layouts.sh \
-    --input "${INPUT}" \
-    --out-base "${root}" \
-    ${PARTITION_BY:+--partition-by "${PARTITION_BY}"} \
-    ${RANGE_COLS:+--range-cols "${RANGE_COLS}"} \
-    ${LAYOUT_COLS:+--layout-cols "${LAYOUT_COLS}"}
+  $OVERWRITE && { echo "[overwrite] removing ${DELTA_ROOT}"; safe_rm "${DELTA_ROOT}"; }
+  banner "Delta layouts (amazon)"
+  local -a args=(
+    --input "${INPUT}"
+    --out-base "${DELTA_ROOT}"
+    --partition-by "${PARTITION_BY}"
+    --range-cols "${RANGE_COLS}"
+    --layout-cols "${LAYOUT_COLS}"
+  )
+  [[ -n "${DELTA_LAYOUTS:-}" ]] && args+=(--layouts "${DELTA_LAYOUTS}")
+  bash "$DELTA_SPEC_SCRIPT" "${args[@]}"
 }
 
 run_hudi() {
-  local root="./data/reviews/hudi"
-  $OVERWRITE && { echo "[overwrite] removing ${root}"; safe_rm "$root"; }
-  banner "Hudi build for amazon_review_all.csv"
-  bash ./scripts/run_hudi_layouts.sh \
-    --input "${INPUT}" \
-    --base-dir "${root}" \
-    --record-key "id" \
-    --precombine-field "event_time" \
-    ${PARTITION_BY:+--partition-field "${PARTITION_BY}"} \
-    ${LAYOUT_COLS:+--sort-columns "${LAYOUT_COLS}"}
+  $OVERWRITE && { echo "[overwrite] removing ${HUDI_ROOT}"; safe_rm "${HUDI_ROOT}"; }
+  banner "Hudi layouts (amazon)"
+  local -a args=(
+    --input "${INPUT}"
+    --base-dir "${HUDI_ROOT}"
+    --record-key "user_id,asin"
+    --precombine-field "record_timestamp"
+    --partition-field "${PARTITION_BY}"
+    --sort-columns "${LAYOUT_COLS}"
+    --target-file-mb "256"
+  )
+  [[ -n "${HUDI_LAYOUTS:-}" ]] && args+=(--layouts "${HUDI_LAYOUTS}")
+  bash "$HUDI_SPEC_SCRIPT" "${args[@]}"
 }
 
 run_iceberg() {
-  local wh="./data/reviews/iceberg_wh"
-  $OVERWRITE && { echo "[overwrite] removing ${wh}"; safe_rm "$wh"; }
-  banner "Iceberg build for amazon_review_all.csv"
-  bash ./scripts/run_iceberg_layouts.sh \
-    --input "${INPUT}" \
-    --warehouse "${wh}" \
-    --namespace "${ICEBERG_NS}" \
-    --base-name "${ICEBERG_BASENAME}" \
-    ${PARTITION_BY:+--partition-by "${PARTITION_BY}"} \
-    ${RANGE_COLS:+--range-cols "${RANGE_COLS}"} \
-    ${LAYOUT_COLS:+--layout-cols "${LAYOUT_COLS}"}
+  $OVERWRITE && { echo "[overwrite] removing ${ICEBERG_WH}"; safe_rm "${ICEBERG_WH}"; }
+  banner "Iceberg layouts (amazon)"
+  local -a args=(
+    --input "${INPUT}"
+    --warehouse "${ICEBERG_WH}"
+    --namespace "${ICEBERG_NS}"
+    --base-name "${ICEBERG_BASENAME}"
+    --partition-by "${PARTITION_BY}"
+    --range-cols "${RANGE_COLS}"
+    --layout-cols "${LAYOUT_COLS}"
+    --shuffle "800"
+    --target-file-mb "256"
+  )
+  [[ -n "${ICEBERG_LAYOUTS:-}" ]] && args+=(--layouts "${ICEBERG_LAYOUTS}")
+  bash "$ICEBERG_SPEC_SCRIPT" "${args[@]}"
 }
 
 # ----- Main -----
-echo "Input : ${INPUT}"
-echo "Engines: delta=${ENG_DELTA} hudi=${ENG_HUDI} iceberg=${ENG_ICEBERG} overwrite=${OVERWRITE}"
-echo "Columns: PARTITION_BY='${PARTITION_BY}' RANGE_COLS='${RANGE_COLS}' LAYOUT_COLS='${LAYOUT_COLS}'"
+echo "Input    : ${INPUT}"
+echo "Engines  : delta=${ENG_DELTA} hudi=${ENG_HUDI} iceberg=${ENG_ICEBERG} overwrite=${OVERWRITE}"
+echo "Columns  : PARTITION_BY='${PARTITION_BY}' RANGE_COLS='${RANGE_COLS}' LAYOUT_COLS='${LAYOUT_COLS}'"
+echo "Layouts  : DELTA='${DELTA_LAYOUTS}' | HUDI='${HUDI_LAYOUTS}' | ICEBERG='${ICEBERG_LAYOUTS}'"
+
+mkdir -p "$DATA_ROOT"
 
 $ENG_DELTA   && run_delta
 $ENG_HUDI    && run_hudi
