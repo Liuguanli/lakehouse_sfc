@@ -54,7 +54,7 @@ TPCH_TABLES = {
         "date_cols": ["o_orderdate"],
         "hudi": {
             "record_key": ["o_orderkey"],
-            "partition_field": "o_orderdate",
+            "partition_field": "",
             "precombine_field": "o_orderdate",
         },
     },
@@ -82,7 +82,7 @@ TPCH_TABLES = {
         "date_cols": ["l_shipdate", "l_commitdate", "l_receiptdate"],
         "hudi": {
             "record_key": ["l_orderkey", "l_linenumber"],
-            "partition_field": "l_shipdate",
+            "partition_field": "",
             "precombine_field": "l_shipdate",
         },
     },

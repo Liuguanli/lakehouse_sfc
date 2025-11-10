@@ -48,6 +48,7 @@ def build_spark(args: argparse.Namespace) -> SparkSession:
     builder = (
         SparkSession.builder
         .appName("tpch-all-loader")
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .config("spark.sql.shuffle.partitions", "200")
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
     )
@@ -90,13 +91,15 @@ def ensure_local_dir(path: Path) -> None:
 
 
 def write_delta(df: DataFrame, dst: Path, overwrite: bool) -> None:
-    ensure_local_dir(dst.parent)
+    dst_abs = dst.expanduser().resolve()
+    ensure_local_dir(dst_abs.parent)
     mode = "overwrite" if overwrite else "errorifexists"
-    df.write.format("delta").mode(mode).save(str(dst))
+    df.write.format("delta").mode(mode).save(str(dst_abs))
 
 
 def write_hudi(df: DataFrame, table: str, dst: Path, spec: Dict, overwrite: bool) -> None:
-    ensure_local_dir(dst.parent)
+    dst_abs = dst.expanduser().resolve()
+    ensure_local_dir(dst_abs.parent)
     record_keys = spec["hudi"]["record_key"]
     partition_field = spec["hudi"]["partition_field"]
     if len(record_keys) > 1:
@@ -115,12 +118,14 @@ def write_hudi(df: DataFrame, table: str, dst: Path, spec: Dict, overwrite: bool
         "hoodie.datasource.write.keygenerator.class": keygen,
         "hoodie.datasource.hive_sync.enable": "false",
         "hoodie.datasource.write.hive_style_partitioning": "true",
+        "hoodie.write.markers.type": "DIRECT",
+        "hoodie.timeline.service.enabled": "false",
     }
     mode = "overwrite" if overwrite else "errorifexists"
     (df.write.format("hudi")
        .options(**hudi_conf)
        .mode(mode)
-       .save(str(dst)))
+       .save(str(dst_abs)))
 
 
 def write_iceberg(

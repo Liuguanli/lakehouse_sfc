@@ -33,3 +33,15 @@ $SPARK_HOME/bin/spark-submit \
   ## References
 
   https://docs.delta.io/optimizations-oss/#optimize-performance-with-file-management
+
+
+## commands
+
+nohup bash ./scripts/run_benchmark_tpch_all.sh > tpch_all.log 2>&1 &
+
+nohup bash ./scripts/run_benchmark_tpch_all.sh > /dev/null 2> tpch_err.log &
+
+[1] 1374045
+ps aux | grep run_benchmark_tpch_all.sh
+
+kill -9 1367580 1374045

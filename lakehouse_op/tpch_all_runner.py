@@ -98,12 +98,24 @@ def detect_streams(streams_root: Path) -> List[Path]:
 
 
 def build_spark(args: argparse.Namespace) -> SparkSession:
+    rq._ensure_eventlog_dir_exists()
+    eventlog_dir = os.getenv("SPARK_EVENTLOG_DIR", rq._default_eventlog_dir())
     builder = (
         SparkSession.builder
         .appName(f"tpch-all-runner-{args.engine}")
+        .config("spark.ui.enabled", os.getenv("SPARK_UI_ENABLED", "true"))
+        .config("spark.sql.ui.enabled", os.getenv("SPARK_SQL_UI_ENABLED", "true"))
+        .config("spark.eventLog.enabled", os.getenv("SPARK_EVENTLOG_ENABLED", "true"))
+        .config("spark.eventLog.dir", eventlog_dir)
+        .config("spark.sql.adaptive.enabled", os.getenv("ADAPTIVE", "true"))
+        .config("spark.sql.files.maxPartitionBytes", os.getenv("MAX_PART_BYTES", "256m"))
+        .config("spark.sql.parquet.enableVectorizedReader", os.getenv("VEC_READER", "true"))
+        .config("spark.sql.parquet.cacheMetadata", "false")
+        .config("spark.databricks.io.cache.enabled", "false")
+        .config("spark.ui.retainedJobs", "2000")
+        .config("spark.ui.retainedStages", "2000")
+        .config("spark.sql.ui.retainedExecutions", "2000")
         .config("spark.sql.shuffle.partitions", "200")
-        .config("spark.sql.adaptive.enabled", "true")
-        .config("spark.sql.files.maxPartitionBytes", "256m")
     )
     if args.engine == "delta":
         builder = (
@@ -130,12 +142,12 @@ def register_tables(spark: SparkSession, args: argparse.Namespace, data_root: Pa
     if args.engine == "delta":
         fmt = "delta"
         for table in TABLE_LIST:
-            path = data_root / "delta" / table
+            path = (data_root / "delta" / table).expanduser().resolve()
             spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
     elif args.engine == "hudi":
         fmt = "hudi"
         for table in TABLE_LIST:
-            path = data_root / "hudi" / table
+            path = (data_root / "hudi" / table).expanduser().resolve()
             spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
     else:  # iceberg
         catalog = args.iceberg_catalog
