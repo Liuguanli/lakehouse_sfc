@@ -14,7 +14,7 @@ templates:
     params:
       ts_lo:     {type: date, range: ['2018-01-01', '2023-12-31']}
       ts_hi:     {type: date, range: ['2018-01-01', '2023-12-31'], constraint: "ts_hi >= ts_lo"}
-      rating_min:{type: int,  range: [1, 4]}
+      rating_min: {type: int,  range: [1, 4]}
       hv_lo:     {type: int,  range: [0, 150]}
       hv_hi:     {type: int,  range: [20, 400], constraint: "hv_hi >= hv_lo"}
     interval_rules:
