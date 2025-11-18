@@ -10,6 +10,8 @@
 /viz_out_results/
 /workloads/
 /tests/
+/notebooks/__pycache__/
+/notebooks/.ipynb_checkpoints/
 
 Note.md
 TODO.md
