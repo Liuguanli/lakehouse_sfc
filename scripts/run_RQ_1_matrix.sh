@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bash ./scripts/lakehouse_setup.sh --repair
+# bash ./scripts/lakehouse_setup.sh --repair
 
 source ~/.lakehouse/env
 
@@ -141,6 +141,72 @@ declare -A SCENARIO_O4_V2=(
 )
 
 
+declare -A SCENARIO_AMAZON_DEFAULT=(
+  [name]="amazon_default"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="asin,parent_asin"
+  [target_mb]="128"
+)
+
+declare -A SCENARIO_AMAZON_DEFAULT_V1=(
+  [name]="amazon_default"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="parent_asin,asin"
+  [target_mb]="128"
+)
+
+declare -A SCENARIO_AMAZON_O2_V1=(
+  [name]="amazon_sort_variant"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="asin,user_id"
+  [target_mb]="128"
+)
+
+declare -A SCENARIO_AMAZON_O2_V2=(
+  [name]="amazon_sort_variant"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="user_id,asin"
+  [target_mb]="128"
+)
+
+declare -A SCENARIO_AMAZON_O3_V1=(
+  [name]="amazon_sort_variant"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="user_id,record_timestamp"
+  [target_mb]="128"
+)
+
+declare -A SCENARIO_AMAZON_O3_V2=(
+  [name]="amazon_sort_variant"
+  [dataset]="amazon"
+  [layouts]="no_layout,linear,zorder,hilbert"
+  [record_key]="user_id,asin"
+  [precombine]="record_timestamp"
+  [partition]="category"
+  [sort]="record_timestamp,user_id"
+  [target_mb]="128"
+)
+
 # declare -A SCENARIO_ALT_SORT=(
 #   [name]="shipdate_only"
 #   [scales]="16"
@@ -150,7 +216,8 @@ declare -A SCENARIO_O4_V2=(
 #   [query_args]="--spec spec_tpch_RQ1_Q1_S1_C1_N2_O1.yaml --skip-run"
 # )
 
-SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
+# SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
+SCENARIOS=(SCENARIO_AMAZON_DEFAULT SCENARIO_AMAZON_DEFAULT_V1 SCENARIO_AMAZON_O2_V1 SCENARIO_AMAZON_O2_V2 SCENARIO_AMAZON_O3_V1 SCENARIO_AMAZON_O3_V2)
 
 # ---------------------------------------------------------------------------
 
