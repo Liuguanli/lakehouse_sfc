@@ -47,4 +47,4 @@ nohup bash ./scripts/run_RQ_1_matrix.sh > /dev/null 2> tpch_err.log &
 [1] 1374045
 ps aux | grep run_benchmark_tpch_all.sh
 
-kill -9 1367580 1374045
+kill -9 2085449

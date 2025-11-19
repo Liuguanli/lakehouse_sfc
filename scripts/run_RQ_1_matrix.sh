@@ -50,7 +50,7 @@ DEFAULT_SCALES="16"
 # }
 
 declare -A SCENARIO_DEFAULT=(
-  [name]="baseline"
+  [name]="SCENARIO_DEFAULT"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -62,7 +62,7 @@ declare -A SCENARIO_DEFAULT=(
 )
 
 declare -A SCENARIO_DEFAULT_V1=(
-  [name]="baseline"
+  [name]="SCENARIO_DEFAULT_V1"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -73,7 +73,7 @@ declare -A SCENARIO_DEFAULT_V1=(
 )
 
 declare -A SCENARIO_O2_V1=(
-  [name]="baseline"
+  [name]="SCENARIO_O2_V1"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -84,7 +84,7 @@ declare -A SCENARIO_O2_V1=(
 )
 
 declare -A SCENARIO_O2_V2=(
-  [name]="baseline"
+  [name]="SCENARIO_O2_V2"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -95,7 +95,7 @@ declare -A SCENARIO_O2_V2=(
 )
 
 declare -A SCENARIO_O3_V1=(
-  [name]="baseline"
+  [name]="SCENARIO_O3_V1"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -106,7 +106,7 @@ declare -A SCENARIO_O3_V1=(
 )
 
 declare -A SCENARIO_O3_V2=(
-  [name]="baseline"
+  [name]="SCENARIO_O3_V2"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -117,7 +117,7 @@ declare -A SCENARIO_O3_V2=(
 )
 
 declare -A SCENARIO_O4_V1=(
-  [name]="baseline"
+  [name]="SCENARIO_O4_V1"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
@@ -128,7 +128,7 @@ declare -A SCENARIO_O4_V1=(
 )
 
 declare -A SCENARIO_O4_V2=(
-  [name]="baseline"
+  [name]="SCENARIO_O4_V2"
   [scales]="16"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="l_orderkey,l_linenumber"
