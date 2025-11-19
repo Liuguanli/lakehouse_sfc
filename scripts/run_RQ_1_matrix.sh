@@ -158,7 +158,10 @@ for scenario_var in "${SCENARIOS[@]}"; do
   [[ -n "$name" ]] || name="scenario"
   echo "===== Running scenario: $name ====="
 
+  scenario_dataset="${scenario[dataset]:-tpch}"
   cmd=( "$RUN_SCRIPT" )
+  cmd+=(--dataset "$scenario_dataset")
+  [[ -n ${scenario[dataset_name]:-} ]] && cmd+=(--dataset-name "${scenario[dataset_name]}")
 
   [[ -n ${scenario[scales]:-} ]] && cmd+=(--scales "${scenario[scales]}")
   [[ -n ${scenario[layouts]:-} ]] && cmd+=(--layouts "${scenario[layouts]}")
@@ -197,9 +200,14 @@ for scenario_var in "${SCENARIOS[@]}"; do
   bash "${cmd[@]}"
 
   if [[ ${scenario[skip_load]:-0} -eq 0 ]]; then
-    scales_val="${scenario[scales]:-$DEFAULT_SCALES}"
-    echo "[CLEAN] Removing generated data for scenario=${name}, scales=${scales_val}"
-    bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --scales "${scales_val}"
+    if [[ "$scenario_dataset" == "amazon" ]]; then
+      echo "[CLEAN] Removing generated Amazon data for scenario=${name}"
+      bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --amazon
+    else
+      scales_val="${scenario[scales]:-$DEFAULT_SCALES}"
+      echo "[CLEAN] Removing generated data for scenario=${name}, scales=${scales_val}"
+      bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --scales "${scales_val}"
+    fi
   else
     echo "[SKIP CLEAN] skip_load enabled for scenario=${name}, retaining existing data."
   fi

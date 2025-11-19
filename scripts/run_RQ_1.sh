@@ -13,7 +13,7 @@ set -euo pipefail
 #
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOAD_SCRIPT="${ROOT_DIR}/scripts/load_data_spec/run_hudi_layouts_tpch.sh"
+LOAD_SCRIPT=""
 QUERY_SCRIPT="${ROOT_DIR}/scripts/run_RQ_query.sh"
 
 DEFAULT_SCALES="16"
@@ -29,6 +29,10 @@ LOAD_SORT_COLUMNS=""
 LOAD_TARGET_FILE_MB=""
 LOAD_INPUT_TEMPLATE=""
 LOAD_BASE_TEMPLATE=""
+DATASET_KIND="tpch"
+DATASET_NAME_OVERRIDE=""
+DEFAULT_QUERY_DATASET=""
+QUERY_DATASET_NAME=""
 
 SKIP_LOAD=0
 SKIP_QUERY=0
@@ -42,6 +46,8 @@ usage() {
 run_RQ_1.sh [options] [-- extra run_RQ_query.sh args]
   --scales "16"               Space/comma separated scale factors to build
   --layouts "no_layout,..."   Hudi layout list for load + query stages
+  --dataset NAME              Workload dataset: tpch (default) or amazon
+  --dataset-name STRING       Dataset identifier passed to run_RQ_query (default per dataset)
   --record-key COLS           Override RECORD_KEY env for loader
   --precombine-field COL      Override PRECOMBINE_FIELD env for loader
   --partition-field COLS      Override PARTITION_FIELD env for loader
@@ -63,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       LOAD_SCALES="$2"; shift 2;;
     --layouts)
       LOAD_LAYOUTS="$2"; shift 2;;
+    --dataset)
+      DATASET_KIND="$2"; shift 2;;
+    --dataset-name)
+      DATASET_NAME_OVERRIDE="$2"; shift 2;;
     --record-key)
       LOAD_RECORD_KEY="$2"; shift 2;;
     --precombine-field)
@@ -102,12 +112,32 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+set_dataset_defaults() {
+  case "$DATASET_KIND" in
+    tpch)
+      LOAD_SCRIPT="${ROOT_DIR}/scripts/load_data_spec/run_hudi_layouts_tpch.sh"
+      DEFAULT_QUERY_DATASET="tpch_16"
+      ;;
+    amazon)
+      LOAD_SCRIPT="${ROOT_DIR}/scripts/load_data_spec/run_hudi_layouts_amazon.sh"
+      DEFAULT_QUERY_DATASET="amazon"
+      ;;
+    *)
+      echo "Unsupported dataset type: ${DATASET_KIND}" >&2
+      exit 2
+      ;;
+  }
+  QUERY_DATASET_NAME="${DATASET_NAME_OVERRIDE:-$DEFAULT_QUERY_DATASET}"
+}
+
+set_dataset_defaults
+
 if [[ $SKIP_LOAD -eq 0 ]]; then
   if [[ ! -x "$LOAD_SCRIPT" ]]; then
     echo "Load script not found or not executable: $LOAD_SCRIPT" >&2
     exit 1
   fi
-  echo ">>> Building Hudi layouts for scales=[$LOAD_SCALES], layouts=[$LOAD_LAYOUTS]"
+  echo ">>> Building ${DATASET_KIND} Hudi layouts for scales=[$LOAD_SCALES], layouts=[$LOAD_LAYOUTS]"
   (
     export SCALES="$LOAD_SCALES"
     export HUDI_LAYOUTS="$LOAD_LAYOUTS"
@@ -130,7 +160,7 @@ if [[ $SKIP_QUERY -eq 0 ]]; then
     exit 1
   fi
   echo ">>> Running RQ1 queries (HUDI_LAYOUTS=$LOAD_LAYOUTS)"
-  CMD=( "$QUERY_SCRIPT" )
+  CMD=( "$QUERY_SCRIPT" --workload-type "$DATASET_KIND" --dataset-name "$QUERY_DATASET_NAME" )
   if [[ -n "$QUERY_OUTPUT_ROOT" ]]; then
     CMD+=(--output-root "$QUERY_OUTPUT_ROOT")
   fi

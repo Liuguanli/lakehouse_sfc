@@ -15,18 +15,21 @@ set -euo pipefail
 #
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SPEC_DIR="${ROOT_DIR}/workload_spec/tpch_rq1"
-DEFAULT_OUTPUT_ROOT="${ROOT_DIR}/workloads/tpch_rq1"
-OUTPUT_ROOT="${RQ1_OUTPUT_ROOT:-$DEFAULT_OUTPUT_ROOT}"
-SQL_ROOT="${OUTPUT_ROOT}/sql"
-STATS_FILE="${ROOT_DIR}/workloads/stats/tpch_16_stats.yaml"
-DATASET="tpch_16"
+WORKLOAD_KIND="tpch"
+CUSTOM_OUTPUT_ROOT="${RQ1_OUTPUT_ROOT:-}"
+DATASET_NAME_OVERRIDE=""
+SPEC_DIR=""
+OUTPUT_ROOT=""
+SQL_ROOT=""
+STATS_FILE=""
+DATASET=""
 RUNNER="${ROOT_DIR}/scripts/run_query.sh"
 
 FORCE=0
 SKIP_RUN=0
 LIMIT=0
 SPEC_GLOB="spec_tpch_RQ1_*.yaml"
+SPEC_GLOB_OVERRIDDEN=0
 declare -a SPEC_OVERRIDE=()
 declare -a RUNNER_TAGS=()
 
@@ -34,6 +37,38 @@ HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
 DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
 ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
 declare -a RUN_ENGINES=()
+
+apply_workload_defaults() {
+  case "$WORKLOAD_KIND" in
+    tpch)
+      SPEC_DIR="${ROOT_DIR}/workload_spec/tpch_rq1"
+      local default_root="${ROOT_DIR}/workloads/tpch_rq1"
+      STATS_FILE="${ROOT_DIR}/workloads/stats/tpch_16_stats.yaml"
+      local default_dataset="tpch_16"
+      local default_glob="spec_tpch_RQ1_*.yaml"
+      ;;
+    amazon)
+      SPEC_DIR="${ROOT_DIR}/workload_spec/amazon_rq1"
+      local default_root="${ROOT_DIR}/workloads/amazon_rq1"
+      STATS_FILE="${ROOT_DIR}/workloads/stats/amazon_stats.yaml"
+      local default_dataset="amazon"
+      local default_glob="spec_amazon_RQ1_*.yaml"
+      ;;
+    *)
+      echo "Unsupported workload type: ${WORKLOAD_KIND}" >&2
+      exit 2
+      ;;
+  esac
+  local root_choice="${CUSTOM_OUTPUT_ROOT:-$default_root}"
+  OUTPUT_ROOT="$root_choice"
+  SQL_ROOT="${OUTPUT_ROOT}/sql"
+  DATASET="${DATASET_NAME_OVERRIDE:-$default_dataset}"
+  if [[ $SPEC_GLOB_OVERRIDDEN -eq 0 ]]; then
+    SPEC_GLOB="$default_glob"
+  fi
+}
+
+apply_workload_defaults
 
 usage() {
   cat <<'EOF'
@@ -47,7 +82,9 @@ run_RQ_query.sh [options] [-- extra run_query.sh args]
   --hudi-layouts LIST         Override HUDI layouts passed downstream
   --delta-layouts LIST        Override delta layouts passed downstream
   --iceberg-layouts LIST      Override iceberg layouts passed downstream
-  --output-root DIR           Override output directory (default: workloads/tpch_rq1)
+  --output-root DIR           Override output directory (default depends on workload)
+  --workload-type NAME        Workload type: tpch (default) or amazon
+  --dataset-name NAME         Dataset identifier passed to run_query.sh
 EOF
 }
 
@@ -56,7 +93,7 @@ while [[ $# -gt 0 ]]; do
     --spec)
       SPEC_OVERRIDE+=("$2"); shift 2;;
     --spec-glob)
-      SPEC_GLOB="$2"; shift 2;;
+      SPEC_GLOB="$2"; SPEC_GLOB_OVERRIDDEN=1; shift 2;;
     --limit)
       LIMIT="$2"; shift 2;;
     --force)
@@ -72,9 +109,11 @@ while [[ $# -gt 0 ]]; do
     --iceberg-layouts)
       ICEBERG_LAYOUTS="$2"; shift 2;;
     --output-root)
-      OUTPUT_ROOT="$2"
-      SQL_ROOT="${OUTPUT_ROOT}/sql"
-      shift 2;;
+      CUSTOM_OUTPUT_ROOT="$2"; shift 2;;
+    --workload-type)
+      WORKLOAD_KIND="$2"; shift 2;;
+    --dataset-name)
+      DATASET_NAME_OVERRIDE="$2"; shift 2;;
     --tag)
       RUNNER_TAGS+=("$2"); shift 2;;
     -h|--help)
@@ -83,6 +122,8 @@ while [[ $# -gt 0 ]]; do
       echo "Unknown option: $1" >&2; usage; exit 2;;
   esac
 done
+
+apply_workload_defaults
 
 if [[ ${#RUN_ENGINES[@]} -eq 0 ]]; then
   RUN_ENGINES=(--hudi)

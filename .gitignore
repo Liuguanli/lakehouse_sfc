@@ -13,10 +13,16 @@
 /notebooks/__pycache__/
 /notebooks/.ipynb_checkpoints/
 /workload_spec/tpch_rq1/
+/workload_spec/amazon_rq1/
 /workload_spec/tpch_rq2/
+/workload_spec/amazon_rq2/
 /workload_spec/tpch_rq3/
+/workload_spec/amazon_rq3/
 /workload_spec/tpch_rq4/
+/workload_spec/amazon_rq4/
 /workload_spec/tpch_rq5/
+/workload_spec/amazon_rq5/
+
 Note.md
 TODO.md
 
