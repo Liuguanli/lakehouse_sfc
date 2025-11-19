@@ -126,7 +126,7 @@ set_dataset_defaults() {
       echo "Unsupported dataset type: ${DATASET_KIND}" >&2
       exit 2
       ;;
-  }
+  esac
   QUERY_DATASET_NAME="${DATASET_NAME_OVERRIDE:-$DEFAULT_QUERY_DATASET}"
 }
 
