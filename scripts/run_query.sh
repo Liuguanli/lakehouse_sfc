@@ -11,6 +11,7 @@ set -euo pipefail
 #   --delta     Run Delta engine only
 #   --hudi      Run Hudi engine only
 #   --iceberg   Run Iceberg engine only
+#   --tag STR   Optional label appended to results/log directory names
 #   (default)   Run all three engines if none specified
 # ============================================================
 
@@ -24,6 +25,7 @@ RUN_ICEBERG=0
 HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
 DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
 ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
+declare -a RUN_TAGS=()
 
 # ---------- Parse optional engine flags ----------
 while [[ $# -gt 0 ]]; do
@@ -37,6 +39,8 @@ while [[ $# -gt 0 ]]; do
       DELTA_LAYOUTS="$2"; shift 2;;
     --iceberg-layouts)
       ICEBERG_LAYOUTS="$2"; shift 2;;
+    --tag)
+      RUN_TAGS+=("$2"); shift 2;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0;;
     *) echo "Unknown option: $1" >&2; exit 2;;
@@ -80,8 +84,30 @@ DELTA_ROOT="${ROOT}/data/${DATASET}/delta"
 
 WORKLOAD_NAME="$(basename "$WORKLOAD_DIR")"
 TS="$(date +%Y%m%d_%H%M%S)"
-RESULTS_DIR="results/${WORKLOAD_NAME}/${TS}"
-LOG_DIR="log/${DATASET}/${WORKLOAD_NAME}/${TS}"
+tag_suffix=""
+if [[ ${#RUN_TAGS[@]} -gt 0 ]]; then
+  sanitize_tag() {
+    local t="$1"
+    t="${t// /_}"
+    t="${t//[^A-Za-z0-9._=-]/_}"
+    printf '%s' "$t"
+  }
+  tag_join=""
+  for tag in "${RUN_TAGS[@]}"; do
+    norm="$(sanitize_tag "$tag")"
+    if [[ -n "$norm" ]]; then
+      if [[ -n "$tag_join" ]]; then
+        tag_join+="_"
+      fi
+      tag_join+="$norm"
+    fi
+  done
+  if [[ -n "$tag_join" ]]; then
+    tag_suffix="__${tag_join}"
+  fi
+fi
+RESULTS_DIR="results/${WORKLOAD_NAME}/${TS}${tag_suffix}"
+LOG_DIR="log/${DATASET}/${WORKLOAD_NAME}/${TS}${tag_suffix}"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 
 echo "DATASET     = $DATASET"

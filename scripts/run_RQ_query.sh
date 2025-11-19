@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -euo pipefail
+#
+# Drive the RQ1 workload:
+#   1. Pick query specs from workload_spec/tpch_rq1/*.yaml (or a filtered subset).
+#   2. Materialise SQL via wlg.cli fill using tpch_16 stats.
+#   3. Execute the resulting workload directory via scripts/run_query.sh with
+#      Hudi layouts (or user supplied layout lists).
+#
+# Usage examples:
+#   bash scripts/run_RQ_query.sh                       # run every spec
+#   bash scripts/run_RQ_query.sh --limit 10            # run first 10 specs only
+#   bash scripts/run_RQ_query.sh --spec spec_tpch_RQ1_Q1_S1_C1_N2_O1.yaml
+#   HUDI_LAYOUTS="no_layout,hilbert" bash scripts/run_RQ_query.sh --skip-run
+#
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SPEC_DIR="${ROOT_DIR}/workload_spec/tpch_rq1"
+DEFAULT_OUTPUT_ROOT="${ROOT_DIR}/workloads/tpch_rq1"
+OUTPUT_ROOT="${RQ1_OUTPUT_ROOT:-$DEFAULT_OUTPUT_ROOT}"
+SQL_ROOT="${OUTPUT_ROOT}/sql"
+STATS_FILE="${ROOT_DIR}/workloads/stats/tpch_16_stats.yaml"
+DATASET="tpch_16"
+RUNNER="${ROOT_DIR}/scripts/run_query.sh"
+
+FORCE=0
+SKIP_RUN=0
+LIMIT=0
+SPEC_GLOB="spec_tpch_RQ1_*.yaml"
+declare -a SPEC_OVERRIDE=()
+declare -a RUNNER_TAGS=()
+
+HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
+DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
+ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
+declare -a RUN_ENGINES=()
+
+usage() {
+  cat <<'EOF'
+run_RQ_query.sh [options] [-- extra run_query.sh args]
+  --spec FILE                 Run a particular spec (under workload_spec/tpch_rq1)
+  --spec-glob PATTERN         Glob for spec discovery (default: spec_tpch_RQ1_*.yaml)
+  --limit N                   Only process the first N specs
+  --force                     Regenerate SQL even if already present
+  --skip-run                  Only generate SQL; skip execution
+  --delta / --iceberg         Include those engines when invoking run_query.sh
+  --hudi-layouts LIST         Override HUDI layouts passed downstream
+  --delta-layouts LIST        Override delta layouts passed downstream
+  --iceberg-layouts LIST      Override iceberg layouts passed downstream
+  --output-root DIR           Override output directory (default: workloads/tpch_rq1)
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --spec)
+      SPEC_OVERRIDE+=("$2"); shift 2;;
+    --spec-glob)
+      SPEC_GLOB="$2"; shift 2;;
+    --limit)
+      LIMIT="$2"; shift 2;;
+    --force)
+      FORCE=1; shift;;
+    --skip-run)
+      SKIP_RUN=1; shift;;
+    --delta) RUN_ENGINES+=(--delta); shift;;
+    --iceberg) RUN_ENGINES+=(--iceberg); shift;;
+    --hudi-layouts)
+      HUDI_LAYOUTS="$2"; shift 2;;
+    --delta-layouts)
+      DELTA_LAYOUTS="$2"; shift 2;;
+    --iceberg-layouts)
+      ICEBERG_LAYOUTS="$2"; shift 2;;
+    --output-root)
+      OUTPUT_ROOT="$2"
+      SQL_ROOT="${OUTPUT_ROOT}/sql"
+      shift 2;;
+    --tag)
+      RUNNER_TAGS+=("$2"); shift 2;;
+    -h|--help)
+      usage; exit 0;;
+    *)
+      echo "Unknown option: $1" >&2; usage; exit 2;;
+  esac
+done
+
+if [[ ${#RUN_ENGINES[@]} -eq 0 ]]; then
+  RUN_ENGINES=(--hudi)
+fi
+
+if [[ ! -f "$STATS_FILE" ]]; then
+  echo "Stats file not found: $STATS_FILE" >&2
+  exit 1
+fi
+
+mkdir -p "$OUTPUT_ROOT" "$SQL_ROOT"
+
+have_sql_files() {
+  local dir="$1"
+  shopt -s nullglob
+  local files=("$dir"/*.sql)
+  shopt -u nullglob
+  [[ ${#files[@]} -gt 0 ]]
+}
+
+collect_specs() {
+  if [[ ${#SPEC_OVERRIDE[@]} -gt 0 ]]; then
+    for spec in "${SPEC_OVERRIDE[@]}"; do
+      local path="$SPEC_DIR/$spec"
+      if [[ -f "$path" ]]; then
+        printf '%s\0' "$path"
+      else
+        echo "[WARN] Spec not found: $path" >&2
+      fi
+    done
+  else
+    find "$SPEC_DIR" -maxdepth 1 -type f -name "$SPEC_GLOB" -print0 | sort -z
+  fi
+}
+
+run_fill() {
+  local spec_path="$1"
+  local base
+  base="$(basename "${spec_path%.*}")"
+  local sql_dir="${SQL_ROOT}/${base}"
+  mkdir -p "$sql_dir"
+
+  local sql_ready=0
+  if have_sql_files "$sql_dir"; then
+    sql_ready=1
+  fi
+
+  if [[ $FORCE -ne 1 && $sql_ready -eq 1 ]]; then
+    echo "[SKIP] Existing workload: $base"
+  else
+    echo "[GEN] $base"
+    python -m wlg.cli fill \
+      --spec "$spec_path" \
+      --stats "$STATS_FILE" \
+      --sql-dir "$sql_dir"
+  fi
+
+  if [[ $SKIP_RUN -eq 0 ]]; then
+    echo "[RUN] dataset=${DATASET}, spec=${base}"
+    cmd=( "$RUNNER" "$DATASET" "$sql_dir"
+          "${RUN_ENGINES[@]}"
+          --hudi-layouts "$HUDI_LAYOUTS"
+          --delta-layouts "$DELTA_LAYOUTS"
+          --iceberg-layouts "$ICEBERG_LAYOUTS" )
+    for tag in "${RUNNER_TAGS[@]}"; do
+      cmd+=(--tag "$tag")
+    done
+    HUDI_LAYOUTS="$HUDI_LAYOUTS" \
+    DELTA_LAYOUTS="$DELTA_LAYOUTS" \
+    ICEBERG_LAYOUTS="$ICEBERG_LAYOUTS" \
+      bash "${cmd[@]}"
+  fi
+}
+
+count=0
+while IFS= read -r -d '' spec_file; do
+  if [[ ! -f "$spec_file" ]]; then
+    continue
+  fi
+  run_fill "$spec_file"
+  count=$((count + 1))
+  if [[ $LIMIT -gt 0 && $count -ge $LIMIT ]]; then
+    break
+  fi
+done < <(collect_specs)
+
+echo "[DONE] Processed ${count} spec(s)."
