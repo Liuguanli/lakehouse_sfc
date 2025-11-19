@@ -105,9 +105,12 @@ def fill(
         d0, d1 = dt.date.fromisoformat(str(lo)), dt.date.fromisoformat(str(hi))
         return (d1 - d0).days
 
+    float_like = {"float", "number", "numeric"}
+    categorical_like = {"string", "categorical"}
+
     def _cast_value(t: str, x):
         if t == "int": return int(x)
-        if t == "float": return float(x)
+        if t in float_like: return float(x)
         if t == "date": return str(x)  # keep ISO
         return x
 
@@ -128,15 +131,22 @@ def fill(
                 kmax = max(0, (hii - loi) // stepi)
                 return loi + rng.randint(0, kmax) * stepi
             return rng.randint(int(lo), int(hi))
-        if t == "float":
+        if t in float_like:
             if lo is None or hi is None:
-                raise ValueError("float param requires explicit range [lo, hi] or ratio rule.")
+                raise ValueError("float/number param requires explicit range [lo, hi] or ratio rule.")
             if step:
                 lof, hif, stepf = float(lo), float(hi), float(step)
                 cnt = int(round((hif - lof) / stepf)) + 1
                 idx = rng.randint(0, max(0, cnt - 1))
                 return round(lof + idx * stepf, 12)
             return rng.uniform(float(lo), float(hi))
+        if t in categorical_like:
+            choices = p.get("choices") or []
+            if choices:
+                return rng.choice(choices)
+            if lo is not None:
+                return lo
+            raise ValueError("categorical param needs 'choices' or explicit 'range/lo'")
         return lo
 
     def _grid_values(p: dict, m: int):
@@ -153,14 +163,27 @@ def fill(
                 return list(range(int(lo), int(hi) + 1, int(step)))[:m]
             if m == 1: return [int((int(lo) + int(hi)) // 2)]
             return [int(round(int(lo) + i * (int(hi) - int(lo)) / (m - 1))) for i in range(m)]
-        if t == "float":
-            if lo is None or hi is None: raise ValueError("float param needs range for grid")
+        if t in float_like:
+            if lo is None or hi is None: raise ValueError("float/number param needs range for grid")
             if step:
                 lof, hif, stepf = float(lo), float(hi), float(step)
                 cnt = int(round((hif - lof) / stepf)) + 1
                 return [round(lof + i * stepf, 12) for i in range(min(cnt, m))]
             if m == 1: return [0.5 * (float(lo) + float(hi))]
             return [float(lo) + i * (float(hi) - float(lo)) / (m - 1) for i in range(m)]
+        if t in categorical_like:
+            choices = p.get("choices") or []
+            if not choices:
+                raise ValueError("categorical param needs 'choices' for grid mode")
+            if m == 1:
+                return [choices[0]]
+            if len(choices) >= m:
+                return choices[:m]
+            # repeat choices to reach m
+            res = []
+            while len(res) < m:
+                res.extend(choices)
+            return res[:m]
         return [lo] * m
 
     def _lhs_values(p: dict, m: int):
@@ -172,7 +195,7 @@ def fill(
             picks = [rng.randint(a, max(a, b)) for a, b in bins]; rng.shuffle(picks)
             base = dt.date.fromisoformat(str(lo))
             return [str(base + dt.timedelta(days=i)) for i in picks]
-        if t in ("int", "float"):
+        if t in ("int", *float_like):
             if lo is None or hi is None: raise ValueError(f"{t} param needs range for lhs")
             pts = []
             for i in range(m):
@@ -182,6 +205,14 @@ def fill(
                 pts.append(int(round(x)) if t == "int" else x)
             rng.shuffle(pts)
             return pts
+        if t in categorical_like:
+            choices = p.get("choices") or []
+            if not choices:
+                raise ValueError("categorical param needs 'choices' for lhs mode")
+            res = []
+            for _ in range(m):
+                res.append(rng.choice(choices))
+            return res
         return [lo] * m
 
     def _constraints_ok(row: dict, param_defs: dict) -> bool:
@@ -252,11 +283,31 @@ def fill(
                 hi_val = min(lo_val + width, H)
                 row[lo_k], row[hi_k] = lo_val, hi_val
 
-            elif tp == "float":
+            elif tp in float_like:
                 L, H = float(dom_lo), float(dom_hi)
                 width = max(0.0, width_ratio * (H - L))
                 start = rng_.uniform(L, max(L, H - width))
                 row[lo_k], row[hi_k] = start, start + width
+
+            elif tp in categorical_like:
+                col = r.get("column")
+                meta = stats_cols.get(col, {}) if col else {}
+                topk = meta.get("topk") or []
+                vals = []
+                for item in topk:
+                    if isinstance(item, (list, tuple)) and item:
+                        vals.append(item[0])
+                    else:
+                        vals.append(item)
+                values = sorted({str(v) for v in vals if v is not None})
+                if not values:
+                    raise ValueError(f"Missing topk values for categorical interval rule (column={col})")
+                width = max(1, int(round(width_ratio * len(values))))
+                width = min(width, len(values))
+                start = rng_.randint(0, max(0, len(values) - width))
+                lo_val = values[start]
+                hi_val = values[start + width - 1]
+                row[lo_k], row[hi_k] = lo_val, hi_val
 
             elif tp == "date":
                 # --- helpers ---

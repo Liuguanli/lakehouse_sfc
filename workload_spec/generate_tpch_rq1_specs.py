@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate spec_tpch_RQ1_* workload specs by enumerating query/selectivity combos."""
+"""Generate spec_tpch_RQ1_* workload specs, with optional filters to narrow generation."""
 
 from __future__ import annotations
 
@@ -196,19 +196,37 @@ def build_spec(
     }
 
 
-def main(overwrite: bool = True):
+def main(
+    overwrite: bool = True,
+    queries: list[str] | None = None,
+    selectivities: list[str] | None = None,
+    column_configs: list[str] | None = None,
+):
     column_meta = load_column_stats(STATS_PATH)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    query_filter = set(queries) if queries else None
+    selectivity_filter = set(selectivities) if selectivities else None
+    column_config_filter = set(column_configs) if column_configs else None
+
     total = 0
     for query in QUERY_DEFS:
+        if query_filter and query["id"] not in query_filter:
+            continue
+
         if query["kind"] == "point":
             selectivity_items = [("S0", None)]
         else:
             selectivity_items = [(label, ratio) for label, ratio in SELECTIVITY_BANDS.items()]
 
         for sel_label, sel_ratio in selectivity_items:
+            if selectivity_filter and sel_label not in selectivity_filter:
+                continue
+
             for cfg_label in COLUMN_CONFIGS:
+                if column_config_filter and cfg_label not in column_config_filter:
+                    continue
+
                 spec = build_spec(query, sel_label, cfg_label, column_meta, sel_ratio)
                 stem = f"spec_tpch_RQ1_{query['id']}_{sel_label}_{cfg_label}.yaml"
                 out_path = OUTPUT_DIR / stem
@@ -226,7 +244,35 @@ if __name__ == "__main__":
         action="store_true",
         help="skip writing specs that already exist",
     )
+    parser.add_argument(
+        "--query",
+        action="append",
+        dest="queries",
+        default=None,
+        help="limit generation to specific query ids (repeatable)",
+    )
+    parser.add_argument(
+        "--selectivity",
+        action="append",
+        dest="selectivities",
+        default=None,
+        help="limit generation to selectivity labels like S0, S1, ... (repeatable)",
+    )
+    parser.add_argument(
+        "--column-config",
+        action="append",
+        dest="column_configs",
+        default=None,
+        help="limit generation to column config labels like C1_N2_O1 (repeatable)",
+    )
     args = parser.parse_args()
-    main(overwrite=not args.no_overwrite)
+    main(
+        overwrite=not args.no_overwrite,
+        queries=args.queries,
+        selectivities=args.selectivities,
+        column_configs=args.column_configs,
+    )
 
 # python workload_spec/generate_tpch_rq1_specs.py --no-overwrite
+# python workload_spec/generate_tpch_rq1_specs.py --query Q1_N1_4 --selectivity S1 --column-config C1_N2_O1
+# spec_tpch_RQ1_Q1_N1_4_S1_C1_N2_O1.yaml
