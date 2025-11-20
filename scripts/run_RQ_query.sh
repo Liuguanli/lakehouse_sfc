@@ -32,6 +32,8 @@ SPEC_GLOB="spec_tpch_RQ1_*.yaml"
 SPEC_GLOB_OVERRIDDEN=0
 declare -a SPEC_OVERRIDE=()
 declare -a RUNNER_TAGS=()
+START_AFTER=""
+START_FOUND=0
 
 HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
 DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
@@ -76,6 +78,7 @@ run_RQ_query.sh [options] [-- extra run_query.sh args]
   --spec FILE                 Run a particular spec (under workload_spec/tpch_rq1)
   --spec-glob PATTERN         Glob for spec discovery (default: spec_tpch_RQ1_*.yaml)
   --limit N                   Only process the first N specs
+  --start-after FILE          Skip specs until after FILE (basename or .yaml)
   --force                     Regenerate SQL even if already present
   --skip-run                  Only generate SQL; skip execution
   --delta / --iceberg         Include those engines when invoking run_query.sh
@@ -96,6 +99,8 @@ while [[ $# -gt 0 ]]; do
       SPEC_GLOB="$2"; SPEC_GLOB_OVERRIDDEN=1; shift 2;;
     --limit)
       LIMIT="$2"; shift 2;;
+    --start-after)
+      START_AFTER="$2"; shift 2;;
     --force)
       FORCE=1; shift;;
     --skip-run)
@@ -199,9 +204,26 @@ run_fill() {
 }
 
 count=0
+start_gate=1
+start_match=""
+if [[ -n "$START_AFTER" ]]; then
+  start_gate=0
+  start_match="${START_AFTER%.yaml}.yaml"
+fi
+
 while IFS= read -r -d '' spec_file; do
   if [[ ! -f "$spec_file" ]]; then
     continue
+  fi
+  if [[ $start_gate -eq 0 ]]; then
+    base="$(basename "$spec_file")"
+    if [[ "$base" == "$start_match" ]]; then
+      start_gate=1
+      START_FOUND=1
+      continue  # start *after* the matched file
+    else
+      continue
+    fi
   fi
   run_fill "$spec_file"
   count=$((count + 1))
@@ -209,5 +231,9 @@ while IFS= read -r -d '' spec_file; do
     break
   fi
 done < <(collect_specs)
+
+if [[ -n "$START_AFTER" && $START_FOUND -eq 0 ]]; then
+  echo "[WARN] --start-after target not found: $START_AFTER" >&2
+fi
 
 echo "[DONE] Processed ${count} spec(s)."

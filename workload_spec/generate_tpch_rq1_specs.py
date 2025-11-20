@@ -274,5 +274,12 @@ if __name__ == "__main__":
     )
 
 # python workload_spec/generate_tpch_rq1_specs.py --no-overwrite
-# python workload_spec/generate_tpch_rq1_specs.py --query Q1_N1_4 --selectivity S1 --column-config C1_N2_O1
+# python workload_spec/generate_tpch_rq1_specs.py --query Q3_K1_1 --selectivity S0 --column-config C1_N2_O1
 # spec_tpch_RQ1_Q1_N1_4_S1_C1_N2_O1.yaml
+# = PosixPath('workload_spec/tpch_rq1/spec_tpch_RQ1_Q3_K1_1_S0_C1_N2_O1.yaml') 
+
+# python -m wlg.cli fill \
+#   --spec workload_spec/tpch_rq1/spec_tpch_RQ1_Q3_K1_1_S0_C1_N2_O1.yaml \
+#   --stats workloads/stats/tpch_16_stats.yaml \
+#   --out workloads/yaml/tmp.yaml \
+#   --sql-dir workloads/sql_tmp

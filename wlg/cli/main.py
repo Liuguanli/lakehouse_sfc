@@ -114,10 +114,29 @@ def fill(
         if t == "date": return str(x)  # keep ISO
         return x
 
-    def _sample_one(p: dict):
+    def _cat_values(pname: str, p: dict):
+        choices = p.get("choices") or []
+        if choices:
+            return [str(c) for c in choices]
+        # infer column name from param name like "asin_v1" -> "asin"
+        col = pname
+        if "_v" in pname:
+            col = pname.split("_v", 1)[0]
+        meta = stats_cols.get(col, {}) if col else {}
+        topk = meta.get("topk") or []
+        vals = []
+        for item in topk:
+            if isinstance(item, (list, tuple)) and item:
+                vals.append(item[0])
+            else:
+                vals.append(item)
+        return [str(v) for v in vals if v is not None]
+
+    def _sample_one(pname: str, p: dict):
         """Sample one param (ONLY for params not covered by interval_rules)."""
         t = p["type"]; lo, hi = p.get("range", [None, None]); step = p.get("step")
         if t == "date":
+            lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None:
                 raise ValueError("date param requires explicit range [lo, hi]")
             days = max(0, _date_span(lo, hi))
@@ -141,17 +160,18 @@ def fill(
                 return round(lof + idx * stepf, 12)
             return rng.uniform(float(lo), float(hi))
         if t in categorical_like:
-            choices = p.get("choices") or []
-            if choices:
-                return rng.choice(choices)
+            vals = _cat_values(pname, p)
+            if vals:
+                return rng.choice(vals)
             if lo is not None:
                 return lo
-            raise ValueError("categorical param needs 'choices' or explicit 'range/lo'")
+            raise ValueError(f"categorical param '{pname}' needs values (choices/topk/range)")
         return lo
 
-    def _grid_values(p: dict, m: int):
+    def _grid_values(pname: str, p: dict, m: int):
         t = p["type"]; lo, hi = p.get("range", [None, None]); step = p.get("step")
         if t == "date":
+            lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None: raise ValueError("date param needs range for grid")
             days = max(1, _date_span(lo, hi))
             idxs = [round(i * days / (m - 1)) for i in range(m)] if m > 1 else [0]
@@ -172,9 +192,9 @@ def fill(
             if m == 1: return [0.5 * (float(lo) + float(hi))]
             return [float(lo) + i * (float(hi) - float(lo)) / (m - 1) for i in range(m)]
         if t in categorical_like:
-            choices = p.get("choices") or []
+            choices = _cat_values(pname, p)
             if not choices:
-                raise ValueError("categorical param needs 'choices' for grid mode")
+                raise ValueError(f"categorical param '{pname}' needs values for grid mode")
             if m == 1:
                 return [choices[0]]
             if len(choices) >= m:
@@ -186,9 +206,10 @@ def fill(
             return res[:m]
         return [lo] * m
 
-    def _lhs_values(p: dict, m: int):
+    def _lhs_values(pname: str, p: dict, m: int):
         t = p["type"]; lo, hi = p.get("range", [None, None])
         if t == "date":
+            lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None: raise ValueError("date param needs range for lhs")
             days = max(1, _date_span(lo, hi))
             bins = [(i * days // m, (i + 1) * days // m) for i in range(m)]
@@ -206,9 +227,9 @@ def fill(
             rng.shuffle(pts)
             return pts
         if t in categorical_like:
-            choices = p.get("choices") or []
+            choices = _cat_values(pname, p)
             if not choices:
-                raise ValueError("categorical param needs 'choices' for lhs mode")
+                raise ValueError(f"categorical param '{pname}' needs values for lhs mode")
             res = []
             for _ in range(m):
                 res.append(rng.choice(choices))
@@ -261,8 +282,6 @@ def fill(
         for r in (rules or []):
             lo_k, hi_k, tp = r["lo"], r["hi"], r["type"]
             dom_lo, dom_hi = _resolve_domain(r)
-            if dom_lo is None or dom_hi is None:
-                raise ValueError(f"Missing domain for interval rule (column={r.get('column')})")
             ratio = r.get("ratio"); ratio_rng = r.get("ratio_range")
             if ratio_rng:
                 a, b = float(ratio_rng[0]), float(ratio_rng[1])
@@ -272,24 +291,7 @@ def fill(
             else:
                 raise ValueError("interval_rule requires 'ratio' or 'ratio_range'.")
 
-            if tp == "int":
-                L, H = int(dom_lo), int(dom_hi)
-                width = max(1, int(round(width_ratio * (H - L))))
-                step = int(r.get("align_step", 1))
-                width = max(step, (width // step) * step)
-                start_max = max(L, H - width)
-                lo_val = L if start_max <= L else rng_.randrange(L, start_max + 1, step)
-                lo_val = ((lo_val - L) // step) * step + L
-                hi_val = min(lo_val + width, H)
-                row[lo_k], row[hi_k] = lo_val, hi_val
-
-            elif tp in float_like:
-                L, H = float(dom_lo), float(dom_hi)
-                width = max(0.0, width_ratio * (H - L))
-                start = rng_.uniform(L, max(L, H - width))
-                row[lo_k], row[hi_k] = start, start + width
-
-            elif tp in categorical_like:
+            if tp in categorical_like:
                 col = r.get("column")
                 meta = stats_cols.get(col, {}) if col else {}
                 topk = meta.get("topk") or []
@@ -308,6 +310,27 @@ def fill(
                 lo_val = values[start]
                 hi_val = values[start + width - 1]
                 row[lo_k], row[hi_k] = lo_val, hi_val
+                continue
+
+            if dom_lo is None or dom_hi is None:
+                raise ValueError(f"Missing domain for interval rule (column={r.get('column')})")
+
+            if tp == "int":
+                L, H = int(dom_lo), int(dom_hi)
+                width = max(1, int(round(width_ratio * (H - L))))
+                step = int(r.get("align_step", 1))
+                width = max(step, (width // step) * step)
+                start_max = max(L, H - width)
+                lo_val = L if start_max <= L else rng_.randrange(L, start_max + 1, step)
+                lo_val = ((lo_val - L) // step) * step + L
+                hi_val = min(lo_val + width, H)
+                row[lo_k], row[hi_k] = lo_val, hi_val
+
+            elif tp in float_like:
+                L, H = float(dom_lo), float(dom_hi)
+                width = max(0.0, width_ratio * (H - L))
+                start = rng_.uniform(L, max(L, H - width))
+                row[lo_k], row[hi_k] = start, start + width
 
             elif tp == "date":
                 # --- helpers ---
@@ -420,7 +443,7 @@ def fill(
                 if nm in covered:
                     grids.append([None] * k)
                 else:
-                    grids.append(_grid_values(param_defs[nm], k))
+                    grids.append(_grid_values(nm, param_defs[nm], k))
             for combo in itertools.product(*grids):
                 row = {nm: _cast_value(param_defs[nm]["type"], v) for nm, v in zip(names, combo)}
                 _apply_interval_rules(row, rules, rng)
@@ -435,7 +458,7 @@ def fill(
                 if nm in covered:
                     sets.append([None] * n)
                 else:
-                    sets.append(_lhs_values(param_defs[nm], n))
+                    sets.append(_lhs_values(nm, param_defs[nm], n))
             for i in range(n):
                 row = {nm: _cast_value(param_defs[nm]["type"], sets[j][i]) for j, nm in enumerate(names)}
                 _apply_interval_rules(row, rules, rng)
@@ -460,7 +483,7 @@ def fill(
                 attempts += 1
                 row = {}
                 for nm in names:
-                    row[nm] = None if nm in covered else _cast_value(param_defs[nm]["type"], _sample_one(param_defs[nm]))
+                    row[nm] = None if nm in covered else _cast_value(param_defs[nm]["type"], _sample_one(nm, param_defs[nm]))
                 _apply_interval_rules(row, rules, rng)
                 if _constraints_ok(row, param_defs):
                     candidates.append(row)
