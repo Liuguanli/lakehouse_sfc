@@ -489,10 +489,17 @@ def fill(
                     candidates.append(row)
 
         # Render SQL (if your SQL uses DATE ':d_lo', keep as-is; otherwise you may add dialect logic)
+        def _format_literal(name: str, val):
+            """Format param for SQL substitution."""
+            ptype = (param_defs.get(name) or {}).get("type")
+            if ptype in categorical_like:
+                return "'" + str(val).replace("'", "''") + "'"
+            return str(val)
+
         for row in candidates[:n]:
             sql_filled = sql
             for k, v in row.items():
-                sql_filled = sql_filled.replace(f":{k}", str(v))
+                sql_filled = sql_filled.replace(f":{k}", _format_literal(k, v))
             outputs.append({"tpl": tpl.get("id", "T"), "sql": sql_filled, "params": row})
 
     _ensure_parent_dir(out)
