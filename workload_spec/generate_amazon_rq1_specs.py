@@ -107,7 +107,7 @@ def build_range_template(query_id: str, columns: List[str], ratio, column_meta):
             }
         )
         conditions.append(f"{col} BETWEEN {sql_literal(dtype, lo)} AND {sql_literal(dtype, hi)}")
-    sql_lines = ["SELECT review_id FROM {{tbl}}", f"WHERE {conditions[0]}"]
+    sql_lines = ["SELECT user_id FROM {{tbl}}", f"WHERE {conditions[0]}"]
     for cond in conditions[1:]:
         sql_lines.append(f"AND {cond}")
     sql = "\n      ".join(sql_lines)
@@ -137,7 +137,7 @@ def build_point_template(query_id: str, column: str, fanout: int, column_meta):
         placeholders.append(sql_literal(dtype, name))
     sql = dedent(
         f"""
-        SELECT review_id FROM {{tbl}}
+        SELECT user_id FROM {{tbl}}
         WHERE {column} IN ({', '.join(placeholders)})
         """
     )
