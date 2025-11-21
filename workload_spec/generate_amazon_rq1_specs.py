@@ -45,14 +45,12 @@ COLUMN_CONFIGS = {
 }
 
 QUERY_DEFS = [
-    {"id": "Q1_N1_1", "kind": "range", "columns": ["asin"]},
-    {"id": "Q1_N1_2", "kind": "range", "columns": ["user_id"]},
-    {"id": "Q1_N1_3", "kind": "range", "columns": ["record_timestamp"]},
-    {"id": "Q1_N1_4", "kind": "range", "columns": ["rating"]},
-    {"id": "Q2_N2_1", "kind": "range", "columns": ["asin", "parent_asin"]},
-    {"id": "Q2_N2_2", "kind": "range", "columns": ["asin", "user_id"]},
-    {"id": "Q2_N2_3", "kind": "range", "columns": ["user_id", "record_timestamp"]},
-    {"id": "Q2_N2_4", "kind": "range", "columns": ["record_timestamp", "rating"]},
+    {"id": "Q1_N1_1", "kind": "range", "columns": ["helpful_vote"]},
+    {"id": "Q1_N1_2", "kind": "range", "columns": ["record_timestamp"]},
+    {"id": "Q1_N1_3", "kind": "range", "columns": ["rating"]},
+    {"id": "Q2_N2_1", "kind": "range", "columns": ["rating", "helpful_vote"]},
+    {"id": "Q2_N2_2", "kind": "range", "columns": ["record_timestamp", "helpful_vote"]},
+    {"id": "Q2_N2_3", "kind": "range", "columns": ["record_timestamp", "rating"]},
 ]
 
 for fanout in (1, 2, 4, 8, 16):
@@ -107,7 +105,7 @@ def build_range_template(query_id: str, columns: List[str], ratio, column_meta):
             }
         )
         conditions.append(f"{col} BETWEEN {sql_literal(dtype, lo)} AND {sql_literal(dtype, hi)}")
-    sql_lines = ["SELECT review_id FROM {{tbl}}", f"WHERE {conditions[0]}"]
+    sql_lines = ["SELECT asin, user_id FROM {{tbl}}", f"WHERE {conditions[0]}"]
     for cond in conditions[1:]:
         sql_lines.append(f"AND {cond}")
     sql = "\n      ".join(sql_lines)
@@ -137,7 +135,7 @@ def build_point_template(query_id: str, column: str, fanout: int, column_meta):
         placeholders.append(sql_literal(dtype, name))
     sql = dedent(
         f"""
-        SELECT review_id FROM {{tbl}}
+        SELECT asin, user_id FROM {{{{tbl}}}}
         WHERE {column} IN ({', '.join(placeholders)})
         """
     )
@@ -203,3 +201,4 @@ if __name__ == "__main__":
     args = ap.parse_args()
     main(overwrite=not args.no_overwrite)
 
+# python workload_spec/generate_amazon_rq1_specs.py --no-overwrite

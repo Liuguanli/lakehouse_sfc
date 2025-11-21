@@ -145,7 +145,7 @@ def build_point_template(query_id: str, column: str, fanout: int, column_meta):
         placeholders.append(sql_literal(dtype, name))
     sql = dedent(
         f"""
-        SELECT l_orderkey FROM {{tbl}}
+        SELECT l_orderkey FROM {{{{tbl}}}}
         WHERE {column} IN ({', '.join(placeholders)})
         """
     )
