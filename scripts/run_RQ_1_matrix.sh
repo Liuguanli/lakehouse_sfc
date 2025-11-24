@@ -12,9 +12,8 @@ source ~/.lakehouse/env
 # Customize the scenario associative arrays below as needed.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_SCRIPT="${ROOT_DIR}/scripts/run_RQ_1.sh"
-START_AFTER_SPEC="${RQ1_START_AFTER:-}"
-START_AFTER_CONSUMED=0
+# Allow overriding the runner to decouple matrix logic from RQ1 specifics.
+RUN_SCRIPT="${RQ_MATRIX_RUN_SCRIPT:-${ROOT_DIR}/scripts/run_RQ_1.sh}"
 
 [[ -x "$RUN_SCRIPT" ]] || { echo "Missing run script: $RUN_SCRIPT" >&2; exit 1; }
 
@@ -35,6 +34,7 @@ DEFAULT_SCALES="16"
 #   base_template    : HUDI_BASE_TEMPLATE override
 #   output_root      : explicit query output root (defaults to workloads/tpch_rq1/<name>)
 #   query_args       : extra arguments passed to run_RQ_query.sh (string)
+#   start_after_spec : --start-after argument passed to run_RQ_query.sh
 #   skip_load        : set to 1 to skip load stage (use existing data)
 #   skip_query       : set to 1 to skip query stage
 #
@@ -60,6 +60,8 @@ declare -A SCENARIO_DEFAULT=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_shipdate,l_receiptdate"
   [target_mb]="128"
+  [start_after_spec]="spec_tpch_RQ1_Q3_K1_5_S0_C4_N2_O2.yaml"
+  [skip_load]=1
   # [query_args]="--limit 5"
 )
 
@@ -216,8 +218,8 @@ declare -A SCENARIO_AMAZON_O3_V2=(
 #   [query_args]="--spec spec_tpch_RQ1_Q1_S1_C1_N2_O1.yaml --skip-run"
 # )
 
-# SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
-SCENARIOS=(SCENARIO_AMAZON_DEFAULT SCENARIO_AMAZON_DEFAULT_V1 SCENARIO_AMAZON_O2_V1 SCENARIO_AMAZON_O2_V2 SCENARIO_AMAZON_O3_V1 SCENARIO_AMAZON_O3_V2)
+SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
+# SCENARIOS=(SCENARIO_AMAZON_DEFAULT SCENARIO_AMAZON_DEFAULT_V1 SCENARIO_AMAZON_O2_V1 SCENARIO_AMAZON_O2_V2 SCENARIO_AMAZON_O3_V1 SCENARIO_AMAZON_O3_V2)
 
 # ---------------------------------------------------------------------------
 
@@ -250,9 +252,8 @@ for scenario_var in "${SCENARIOS[@]}"; do
     cmd+=(--skip-query)
   fi
 
-  if [[ -n "$START_AFTER_SPEC" && $START_AFTER_CONSUMED -eq 0 ]]; then
-    cmd+=(--start-after "$START_AFTER_SPEC")
-    START_AFTER_CONSUMED=1  # only apply to the first scenario
+  if [[ -n ${scenario[start_after_spec]:-} ]]; then
+    cmd+=(--start-after "${scenario[start_after_spec]}")
   fi
 
   if [[ -n ${scenario[query_args]:-} ]]; then
