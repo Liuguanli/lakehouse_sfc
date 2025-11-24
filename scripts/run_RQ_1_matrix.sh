@@ -14,7 +14,6 @@ source ~/.lakehouse/env
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Allow overriding the runner to decouple matrix logic from RQ1 specifics.
 RUN_SCRIPT="${RQ_MATRIX_RUN_SCRIPT:-${ROOT_DIR}/scripts/run_RQ_1.sh}"
-
 [[ -x "$RUN_SCRIPT" ]] || { echo "Missing run script: $RUN_SCRIPT" >&2; exit 1; }
 
 DEFAULT_SCALES="16"
@@ -152,6 +151,8 @@ declare -A SCENARIO_AMAZON_DEFAULT=(
   [partition]="category"
   [sort]="asin,parent_asin"
   [target_mb]="128"
+  [start_after_spec]="spec_amazon_RQ1_Q3_K1_1_S0_C5.yaml"
+  [skip_load]=1
 )
 
 declare -A SCENARIO_AMAZON_DEFAULT_V1=(
