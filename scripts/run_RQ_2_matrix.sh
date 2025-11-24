@@ -15,6 +15,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_SCRIPT="${ROOT_DIR}/scripts/run_RQ_1.sh"
 START_AFTER_SPEC="${RQ2_START_AFTER:-}"
 START_AFTER_CONSUMED=0
+DEFAULT_RQ2_QUERY_ARGS="--spec-dir workload_spec/tpch_rq2 --spec-glob spec_tpch_RQ2_*.yaml --workload-type custom --output-root workloads/tpch_rq2"
 
 [[ -x "$RUN_SCRIPT" ]] || { echo "Missing run script: $RUN_SCRIPT" >&2; exit 1; }
 
@@ -271,8 +272,10 @@ for scenario_var in "${SCENARIOS[@]}"; do
     START_AFTER_CONSUMED=1  # only apply to the first scenario
   fi
 
-  if [[ -n ${scenario[query_args]:-} ]]; then
-    read -r -a scenario_query_args <<<"${scenario[query_args]}"
+  # Default to RQ2 spec dir/glob unless overridden per scenario.
+  scenario_query_args_str="${scenario[query_args]:-$DEFAULT_RQ2_QUERY_ARGS}"
+  if [[ -n "$scenario_query_args_str" ]]; then
+    read -r -a scenario_query_args <<<"$scenario_query_args_str"
     cmd+=(-- "${scenario_query_args[@]}")
   fi
 

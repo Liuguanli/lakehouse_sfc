@@ -19,6 +19,7 @@ WORKLOAD_KIND="tpch"
 CUSTOM_OUTPUT_ROOT="${RQ1_OUTPUT_ROOT:-}"
 DATASET_NAME_OVERRIDE=""
 SPEC_DIR=""
+SPEC_DIR_OVERRIDE=""
 OUTPUT_ROOT=""
 SQL_ROOT=""
 STATS_FILE=""
@@ -41,32 +42,43 @@ ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
 declare -a RUN_ENGINES=()
 
 apply_workload_defaults() {
+  # Defaults per workload type; can be overridden via --spec-dir/--spec-glob.
   case "$WORKLOAD_KIND" in
     tpch)
-      SPEC_DIR="${ROOT_DIR}/workload_spec/tpch_rq1"
+      local default_spec_dir="${ROOT_DIR}/workload_spec/tpch_rq1"
       local default_root="${ROOT_DIR}/workloads/tpch_rq1"
       STATS_FILE="${ROOT_DIR}/workloads/stats/tpch_16_stats.yaml"
       local default_dataset="tpch_16"
       local default_glob="spec_tpch_RQ1_*.yaml"
       ;;
     amazon)
-      SPEC_DIR="${ROOT_DIR}/workload_spec/amazon_rq1"
+      local default_spec_dir="${ROOT_DIR}/workload_spec/amazon_rq1"
       local default_root="${ROOT_DIR}/workloads/amazon_rq1"
       STATS_FILE="${ROOT_DIR}/workloads/stats/amazon_stats.yaml"
       local default_dataset="amazon"
       local default_glob="spec_amazon_RQ1_*.yaml"
+      ;;
+    custom)
+      local default_spec_dir=""
+      local default_root="${ROOT_DIR}/workloads/custom"
+      STATS_FILE="${ROOT_DIR}/workloads/stats/tpch_16_stats.yaml"
+      local default_dataset="tpch_16"
+      local default_glob="spec_*.yaml"
       ;;
     *)
       echo "Unsupported workload type: ${WORKLOAD_KIND}" >&2
       exit 2
       ;;
   esac
+
+  SPEC_DIR="${SPEC_DIR_OVERRIDE:-$default_spec_dir}"
   local root_choice="${CUSTOM_OUTPUT_ROOT:-$default_root}"
   OUTPUT_ROOT="$root_choice"
   SQL_ROOT="${OUTPUT_ROOT}/sql"
   DATASET="${DATASET_NAME_OVERRIDE:-$default_dataset}"
   if [[ $SPEC_GLOB_OVERRIDDEN -eq 0 ]]; then
-    SPEC_GLOB="$default_glob"
+    SPEC_GLOB="${SPEC_DIR_OVERRIDE:+spec_*.yaml}"
+    [[ -z "$SPEC_GLOB" ]] && SPEC_GLOB="$default_glob"
   fi
 }
 
@@ -85,6 +97,7 @@ run_RQ_query.sh [options] [-- extra run_query.sh args]
   --hudi-layouts LIST         Override HUDI layouts passed downstream
   --delta-layouts LIST        Override delta layouts passed downstream
   --iceberg-layouts LIST      Override iceberg layouts passed downstream
+  --spec-dir DIR              Override spec directory (default depends on workload)
   --output-root DIR           Override output directory (default depends on workload)
   --workload-type NAME        Workload type: tpch (default) or amazon
   --dataset-name NAME         Dataset identifier passed to run_query.sh
@@ -113,6 +126,8 @@ while [[ $# -gt 0 ]]; do
       DELTA_LAYOUTS="$2"; shift 2;;
     --iceberg-layouts)
       ICEBERG_LAYOUTS="$2"; shift 2;;
+    --spec-dir)
+      SPEC_DIR_OVERRIDE="$2"; shift 2;;
     --output-root)
       CUSTOM_OUTPUT_ROOT="$2"; shift 2;;
     --workload-type)
