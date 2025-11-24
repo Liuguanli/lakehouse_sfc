@@ -60,6 +60,7 @@ declare -A SCENARIO_DEFAULT=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_shipdate,l_receiptdate"
   [target_mb]="128"
+  [skip_load]=1
   # [query_args]="--limit 5"
 )
 
@@ -150,6 +151,7 @@ declare -A SCENARIO_AMAZON_DEFAULT=(
   [partition]="category"
   [sort]="asin,parent_asin"
   [target_mb]="128"
+  [skip_load]=1
 )
 
 declare -A SCENARIO_AMAZON_DEFAULT_V1=(
