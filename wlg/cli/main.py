@@ -496,9 +496,10 @@ def fill(
                 return "'" + str(val).replace("'", "''") + "'"
             return str(val)
 
+        # Replace longer placeholders first to avoid prefix collisions (e.g., :col_v1 vs :col_v10)
         for row in candidates[:n]:
             sql_filled = sql
-            for k, v in row.items():
+            for k, v in sorted(row.items(), key=lambda kv: -len(kv[0])):
                 sql_filled = sql_filled.replace(f":{k}", _format_literal(k, v))
             outputs.append({"tpl": tpl.get("id", "T"), "sql": sql_filled, "params": row})
 
