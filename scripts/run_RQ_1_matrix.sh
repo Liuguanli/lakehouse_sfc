@@ -13,8 +13,6 @@ source ~/.lakehouse/env
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_SCRIPT="${ROOT_DIR}/scripts/run_RQ_1.sh"
-START_AFTER_SPEC="${RQ1_START_AFTER:-}"
-START_AFTER_CONSUMED=0
 
 [[ -x "$RUN_SCRIPT" ]] || { echo "Missing run script: $RUN_SCRIPT" >&2; exit 1; }
 
@@ -151,6 +149,7 @@ declare -A SCENARIO_AMAZON_DEFAULT=(
   [partition]="category"
   [sort]="asin,parent_asin"
   [target_mb]="128"
+  [start_after_spec]="spec_amazon_RQ1_Q3_K1_1_S0_C5.yaml"
   [skip_load]=1
 )
 
@@ -252,9 +251,8 @@ for scenario_var in "${SCENARIOS[@]}"; do
     cmd+=(--skip-query)
   fi
 
-  if [[ -n "$START_AFTER_SPEC" && $START_AFTER_CONSUMED -eq 0 ]]; then
-    cmd+=(--start-after "$START_AFTER_SPEC")
-    START_AFTER_CONSUMED=1  # only apply to the first scenario
+  if [[ -n ${scenario[start_after_spec]:-} ]]; then
+    cmd+=(--start-after "${scenario[start_after_spec]}")
   fi
 
   if [[ -n ${scenario[query_args]:-} ]]; then
