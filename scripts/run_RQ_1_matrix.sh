@@ -18,6 +18,19 @@ RUN_SCRIPT="${RQ_MATRIX_RUN_SCRIPT:-${ROOT_DIR}/scripts/run_RQ_1.sh}"
 
 DEFAULT_SCALES="16"
 
+clean_spark_eventlogs() {
+  # Derive the on-disk path Spark writes event logs to (strip file:// if present).
+  local ev_dir="${SPARK_EVENTLOG_DIR:-${ROOT_DIR}/spark_eventlogs}"
+  ev_dir="${ev_dir#file://}"
+  if [[ -d "$ev_dir" ]]; then
+    echo "[CLEAN] Removing Spark event logs under $ev_dir"
+    # Best-effort cleanup; don't fail the matrix run if a file can't be removed.
+    find "$ev_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+  else
+    echo "[SKIP CLEAN] Spark eventlog dir not found: $ev_dir"
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Scenario definitions (edit to taste)
 # Each associative array may set the following keys:
@@ -267,7 +280,7 @@ for scenario_var in "${SCENARIOS[@]}"; do
       declare -f usage >/dev/null 2>&1 || true
     )
   fi
-  bash "${cmd[@]}"
+  RQ_MATRIX_SCENARIO="$name" bash "${cmd[@]}"
 
   if [[ ${scenario[skip_load]:-0} -eq 0 ]]; then
     if [[ "$scenario_dataset" == "amazon" ]]; then
@@ -281,6 +294,8 @@ for scenario_var in "${SCENARIOS[@]}"; do
   else
     echo "[SKIP CLEAN] skip_load enabled for scenario=${name}, retaining existing data."
   fi
+
+  clean_spark_eventlogs
 done
 
 echo "[DONE] All scenarios completed."

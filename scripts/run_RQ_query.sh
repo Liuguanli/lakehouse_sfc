@@ -149,6 +149,8 @@ if [[ ${#RUN_ENGINES[@]} -eq 0 ]]; then
   RUN_ENGINES=(--hudi)
 fi
 
+MATRIX_SCENARIO="${RQ_MATRIX_SCENARIO:-}"
+
 if [[ ! -f "$STATS_FILE" ]]; then
   echo "Stats file not found: $STATS_FILE" >&2
   exit 1
@@ -240,6 +242,7 @@ while IFS= read -r -d '' spec_file; do
       continue
     fi
   fi
+  echo "[SPEC] scenario=${MATRIX_SCENARIO:-unknown} spec=$(basename "$spec_file")"
   run_fill "$spec_file"
   count=$((count + 1))
   if [[ $LIMIT -gt 0 && $count -ge $LIMIT ]]; then

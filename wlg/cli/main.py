@@ -99,6 +99,7 @@ def fill(
     if stats and stats.exists():
         raw_stats = yaml.safe_load(stats.read_text()) or {}
     stats_cols = raw_stats.get("columns", raw_stats) or {}
+    stats_schema = (raw_stats.get("metadata") or {}).get("schema", {}) or {}
 
     # ---------- helpers ----------
     def _date_span(lo: str, hi: str) -> int:
@@ -107,6 +108,28 @@ def fill(
 
     float_like = {"float", "number", "numeric"}
     categorical_like = {"string", "categorical"}
+    int_like_names = {"int", "integer", "bigint", "long", "int32", "int64"}
+
+    def _param_column(name: str) -> str:
+        """Infer column name from a param like 'l_suppkey_v1' -> 'l_suppkey'."""
+        if "_v" in name:
+            return name.split("_v", 1)[0]
+        return name
+
+    def _is_int_column(col: str) -> bool:
+        dtype = str(stats_schema.get(col, "")).lower()
+        return dtype.split(":")[0] in int_like_names or dtype.startswith("int")
+
+    def _topk_values(col: str):
+        meta = stats_cols.get(col, {}) if col else {}
+        topk = meta.get("topk") or []
+        vals = []
+        for item in topk:
+            if isinstance(item, (list, tuple)) and item:
+                vals.append(item[0])
+            else:
+                vals.append(item)
+        return [v for v in vals if v is not None]
 
     def _cast_value(t: str, x):
         if t == "int": return int(x)
@@ -135,6 +158,11 @@ def fill(
     def _sample_one(pname: str, p: dict):
         """Sample one param (ONLY for params not covered by interval_rules)."""
         t = p["type"]; lo, hi = p.get("range", [None, None]); step = p.get("step")
+        col = _param_column(pname)
+        col_is_int = _is_int_column(col)
+        topk_vals = _topk_values(col)
+        if col_is_int and topk_vals:
+            return int(rng.choice(topk_vals))
         if t == "date":
             lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None:
@@ -153,6 +181,13 @@ def fill(
         if t in float_like:
             if lo is None or hi is None:
                 raise ValueError("float/number param requires explicit range [lo, hi] or ratio rule.")
+            if col_is_int:
+                loi, hii = int(float(lo)), int(float(hi))
+                if step:
+                    stepi = int(step)
+                    kmax = max(0, (hii - loi) // stepi)
+                    return loi + rng.randint(0, kmax) * stepi
+                return rng.randint(loi, hii)
             if step:
                 lof, hif, stepf = float(lo), float(hi), float(step)
                 cnt = int(round((hif - lof) / stepf)) + 1
@@ -170,6 +205,8 @@ def fill(
 
     def _grid_values(pname: str, p: dict, m: int):
         t = p["type"]; lo, hi = p.get("range", [None, None]); step = p.get("step")
+        col = _param_column(pname)
+        col_is_int = _is_int_column(col)
         if t == "date":
             lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None: raise ValueError("date param needs range for grid")
@@ -185,6 +222,11 @@ def fill(
             return [int(round(int(lo) + i * (int(hi) - int(lo)) / (m - 1))) for i in range(m)]
         if t in float_like:
             if lo is None or hi is None: raise ValueError("float/number param needs range for grid")
+            if col_is_int:
+                if step:
+                    return list(range(int(float(lo)), int(float(hi)) + 1, int(step)))[:m]
+                if m == 1: return [int(round(0.5 * (float(lo) + float(hi))))]
+                return [int(round(float(lo) + i * (float(hi) - float(lo)) / (m - 1))) for i in range(m)]
             if step:
                 lof, hif, stepf = float(lo), float(hi), float(step)
                 cnt = int(round((hif - lof) / stepf)) + 1
@@ -208,6 +250,8 @@ def fill(
 
     def _lhs_values(pname: str, p: dict, m: int):
         t = p["type"]; lo, hi = p.get("range", [None, None])
+        col = _param_column(pname)
+        col_is_int = _is_int_column(col)
         if t == "date":
             lo, hi = _epochms_to_iso(lo), _epochms_to_iso(hi)
             if lo is None or hi is None: raise ValueError("date param needs range for lhs")
@@ -223,7 +267,10 @@ def fill(
                 a = float(lo) + i * (float(hi) - float(lo)) / m
                 b = float(lo) + (i + 1) * (float(hi) - float(lo)) / m
                 x = rng.uniform(a, b)
-                pts.append(int(round(x)) if t == "int" else x)
+                if t == "int" or col_is_int:
+                    pts.append(int(round(x)))
+                else:
+                    pts.append(x)
             rng.shuffle(pts)
             return pts
         if t in categorical_like:
