@@ -19,9 +19,8 @@ RUN_SCRIPT="${RQ_MATRIX_RUN_SCRIPT:-${ROOT_DIR}/scripts/run_RQ_1.sh}"
 DEFAULT_SCALES="16"
 
 clean_spark_eventlogs() {
-  # Derive the on-disk path Spark writes event logs to (strip file:// if present).
-  local ev_dir="${SPARK_EVENTLOG_DIR:-${ROOT_DIR}/spark_eventlogs}"
-  ev_dir="${ev_dir#file://}"
+  # Hard-coded event log directory to avoid env/ROOT_DIR variance.
+  local ev_dir="${HOME}/Documents/lakehouse/spark_eventlogs"
   if [[ -d "$ev_dir" ]]; then
     echo "[CLEAN] Removing Spark event logs under $ev_dir"
     # Best-effort cleanup; don't fail the matrix run if a file can't be removed.
