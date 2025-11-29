@@ -168,7 +168,7 @@ declare -A SCENARIO_AMAZON_DEFAULT=(
 )
 
 declare -A SCENARIO_AMAZON_DEFAULT_V1=(
-  [name]="amazon_default"
+  [name]="SCENARIO_AMAZON_DEFAULT_V1"
   [dataset]="amazon"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="user_id,asin"
@@ -179,7 +179,7 @@ declare -A SCENARIO_AMAZON_DEFAULT_V1=(
 )
 
 declare -A SCENARIO_AMAZON_O2_V1=(
-  [name]="amazon_sort_variant"
+  [name]="SCENARIO_AMAZON_O2_V1"
   [dataset]="amazon"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="user_id,asin"
@@ -190,7 +190,7 @@ declare -A SCENARIO_AMAZON_O2_V1=(
 )
 
 declare -A SCENARIO_AMAZON_O2_V2=(
-  [name]="amazon_sort_variant"
+  [name]="SCENARIO_AMAZON_O2_V2"
   [dataset]="amazon"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="user_id,asin"
@@ -201,7 +201,7 @@ declare -A SCENARIO_AMAZON_O2_V2=(
 )
 
 declare -A SCENARIO_AMAZON_O3_V1=(
-  [name]="amazon_sort_variant"
+  [name]="SCENARIO_AMAZON_O3_V1"
   [dataset]="amazon"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="user_id,asin"
@@ -212,7 +212,7 @@ declare -A SCENARIO_AMAZON_O3_V1=(
 )
 
 declare -A SCENARIO_AMAZON_O3_V2=(
-  [name]="amazon_sort_variant"
+  [name]="SCENARIO_AMAZON_O3_V2"
   [dataset]="amazon"
   [layouts]="no_layout,linear,zorder,hilbert"
   [record_key]="user_id,asin"
@@ -231,8 +231,9 @@ declare -A SCENARIO_AMAZON_O3_V2=(
 #   [query_args]="--spec spec_tpch_RQ1_Q1_S1_C1_N2_O1.yaml --skip-run"
 # )
 
-SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
+# SCENARIOS=(SCENARIO_DEFAULT SCENARIO_DEFAULT_V1 SCENARIO_O2_V1 SCENARIO_O2_V2 SCENARIO_O3_V1 SCENARIO_O3_V2 SCENARIO_O4_V1 SCENARIO_O4_V2)
 # SCENARIOS=(SCENARIO_AMAZON_DEFAULT SCENARIO_AMAZON_DEFAULT_V1 SCENARIO_AMAZON_O2_V1 SCENARIO_AMAZON_O2_V2 SCENARIO_AMAZON_O3_V1 SCENARIO_AMAZON_O3_V2)
+SCENARIOS=(SCENARIO_AMAZON_O2_V2 SCENARIO_AMAZON_O3_V1 SCENARIO_AMAZON_O3_V2)
 
 # ---------------------------------------------------------------------------
 
@@ -294,7 +295,6 @@ for scenario_var in "${SCENARIOS[@]}"; do
     echo "[SKIP CLEAN] skip_load enabled for scenario=${name}, retaining existing data."
   fi
 
-  clean_spark_eventlogs
 done
 
 echo "[DONE] All scenarios completed."
