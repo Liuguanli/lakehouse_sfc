@@ -78,17 +78,21 @@ QUERY_DEFS = [
 
 def load_column_stats(path: Path) -> Dict[str, Dict[str, str]]:
     data = yaml.safe_load(path.read_text())
+    schema = {k: (v or "").lower() for k, v in (data.get("schema") or {}).items()}
+
+    def normalize(raw: str) -> str:
+        raw = (raw or "").lower()
+        if "date" in raw:
+            return "date"
+        if any(k in raw for k in ["int", "long"]):
+            return "int"
+        if any(k in raw for k in ["float", "double", "decimal", "numeric"]):
+            return "number"
+        return raw or "string"
+
     result = {}
     for column, meta in data.get("columns", {}).items():
-        kind = (meta.get("kind") or "").lower()
-        if "date" in kind:
-            dtype = "date"
-        elif any(k in kind for k in ["int", "long"]):
-            dtype = "int"
-        elif any(k in kind for k in ["float", "double", "decimal"]):
-            dtype = "number"
-        else:
-            dtype = kind or "string"
+        dtype = normalize(schema.get(column) or meta.get("kind"))
         bounds = [meta.get("min"), meta.get("max")]
         result[column] = {"type": dtype, "bounds": bounds}
     return result
