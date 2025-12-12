@@ -17,6 +17,8 @@ tpch_all/load_data.sh
   --data-root DIR       Output root for lakehouse tables (default: ./data/tpch_all)
   --engines LIST        Comma list of engines (delta,hudi,iceberg). Default: all three.
   --tables LIST         Comma list of tables (default: all TPCH tables)
+  --hudi-layouts LIST   Comma list of Hudi layouts (default: no_layout,linear,zorder,hilbert)
+  --hudi-table-config F JSON file overriding per-table Hudi configs (record_key, precombine_field, partition_field, sort_columns)
   --overwrite           Overwrite existing outputs.
   --spark-home DIR      Override SPARK_HOME if not exported.
   --iceberg-catalog C   Iceberg catalog name (default: tpchall)
@@ -30,6 +32,8 @@ SOURCE="/datasets/tpch_1/data"
 DATA_ROOT="./data/tpch_all"
 ENGINES="delta,hudi,iceberg"
 TABLES="auto"
+HUDI_LAYOUTS="no_layout,linear,zorder,hilbert"
+HUDI_TABLE_CONFIG=""
 OVERWRITE=0
 SPARK_HOME_OVERRIDE=""
 ICEBERG_CATALOG="tpchall"
@@ -45,6 +49,8 @@ while [[ $# -gt 0 ]]; do
     --data-root) DATA_ROOT="$2"; shift 2;;
     --engines) ENGINES="$2"; shift 2;;
     --tables) TABLES="$2"; shift 2;;
+    --hudi-layouts) HUDI_LAYOUTS="$2"; shift 2;;
+    --hudi-table-config) HUDI_TABLE_CONFIG="$2"; shift 2;;
     --overwrite) OVERWRITE=1; shift;;
     --spark-home) SPARK_HOME_OVERRIDE="$2"; shift 2;;
     --iceberg-catalog) ICEBERG_CATALOG="$2"; shift 2;;
@@ -93,6 +99,8 @@ PYTHONPATH="$REPO_ROOT" "$SPARK_SUBMIT" \
   --data-root "$DATA_ROOT" \
   --engines "$ENGINES" \
   --tables "$TABLE_ARG" \
+  --hudi-layouts "$HUDI_LAYOUTS" \
+  ${HUDI_TABLE_CONFIG:+--hudi-table-config "$HUDI_TABLE_CONFIG"} \
   --iceberg-catalog "$ICEBERG_CATALOG" \
   --iceberg-namespace "$ICEBERG_NAMESPACE" \
   --iceberg-warehouse "$ICEBERG_WAREHOUSE" \

@@ -31,6 +31,8 @@ SKIP_RUN=0
 LIMIT=0
 SPEC_GLOB="spec_tpch_RQ1_*.yaml"
 SPEC_GLOB_OVERRIDDEN=0
+STATS_FILE_OVERRIDE=""
+STATS_FILE_OVERRIDDEN=0
 declare -a SPEC_OVERRIDE=()
 declare -a RUNNER_TAGS=()
 START_AFTER=""
@@ -76,6 +78,9 @@ apply_workload_defaults() {
   OUTPUT_ROOT="$root_choice"
   SQL_ROOT="${OUTPUT_ROOT}/sql"
   DATASET="${DATASET_NAME_OVERRIDE:-$default_dataset}"
+  if [[ $STATS_FILE_OVERRIDDEN -eq 1 ]]; then
+    STATS_FILE="$STATS_FILE_OVERRIDE"
+  fi
   if [[ $SPEC_GLOB_OVERRIDDEN -eq 0 ]]; then
     SPEC_GLOB="${SPEC_DIR_OVERRIDE:+spec_*.yaml}"
     [[ -z "$SPEC_GLOB" ]] && SPEC_GLOB="$default_glob"
@@ -93,6 +98,7 @@ run_RQ_query.sh [options] [-- extra run_query.sh args]
   --start-after FILE          Skip specs until after FILE (basename or .yaml)
   --force                     Regenerate SQL even if already present
   --skip-run                  Only generate SQL; skip execution
+  --stats-file FILE           Override stats YAML used for wlg.cli fill
   --delta / --iceberg         Include those engines when invoking run_query.sh
   --hudi-layouts LIST         Override HUDI layouts passed downstream
   --delta-layouts LIST        Override delta layouts passed downstream
@@ -118,6 +124,8 @@ while [[ $# -gt 0 ]]; do
       FORCE=1; shift;;
     --skip-run)
       SKIP_RUN=1; shift;;
+    --stats-file)
+      STATS_FILE_OVERRIDE="$2"; STATS_FILE_OVERRIDDEN=1; shift 2;;
     --delta) RUN_ENGINES+=(--delta); shift;;
     --iceberg) RUN_ENGINES+=(--iceberg); shift;;
     --hudi-layouts)

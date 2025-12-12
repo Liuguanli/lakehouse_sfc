@@ -20,6 +20,7 @@ tpch_all/run_queries.sh
   --streams-root DIR    Directory containing stream_* folders (default: /datasets/tpch_1/workload).
   --data-root DIR       Root with materialised tables (default: ./data/tpch_all).
   --results-root DIR    Where to store CSV outputs (default: results/tpch_all).
+  --hudi-layout NAME    Hudi layout to read (default: no_layout).
   --spark-home DIR      Override SPARK_HOME.
   --action ACTION       Spark action (count|collect|show). Default: count.
   --timestamp TS        Override timestamp suffix.
@@ -44,6 +45,7 @@ ICEBERG_WAREHOUSE="./data/tpch_all/iceberg_wh"
 DRIVER_MEM="${TPCH_ALL_DRIVER_MEM:-96g}"
 EXEC_MEM="${TPCH_ALL_EXEC_MEM:-96g}"
 EXEC_OVH="${TPCH_ALL_EXEC_OVH:-32g}"
+HUDI_LAYOUT="no_layout"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,6 +54,7 @@ while [[ $# -gt 0 ]]; do
     --streams-root) STREAMS_ROOT="$2"; shift 2;;
     --data-root) DATA_ROOT="$2"; shift 2;;
     --results-root) RESULTS_ROOT="$2"; shift 2;;
+    --hudi-layout) HUDI_LAYOUT="$2"; shift 2;;
     --spark-home) SPARK_HOME_OVERRIDE="$2"; shift 2;;
     --action) ACTION="$2"; shift 2;;
     --timestamp) TIMESTAMP="$2"; shift 2;;
@@ -98,6 +101,7 @@ for eng in ${ENGINES//,/ }; do
       --streams "$STREAMS" \
       --results-root "$RESULTS_ROOT" \
       --action "$ACTION" \
+      --hudi-layout "$HUDI_LAYOUT" \
       --iceberg-catalog "$ICEBERG_CATALOG" \
       --iceberg-namespace "$ICEBERG_NAMESPACE" \
       --iceberg-warehouse "$ICEBERG_WAREHOUSE" \

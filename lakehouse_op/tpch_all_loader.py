@@ -14,6 +14,7 @@ import argparse
 import os
 from pathlib import Path
 from typing import Dict, List
+import json
 
 from pyspark.sql import DataFrame, SparkSession
 
@@ -32,6 +33,10 @@ def parse_args() -> argparse.Namespace:
                     help="Root directory for materialised tables.")
     ap.add_argument("--overwrite", action="store_true",
                     help="Overwrite existing outputs (default: skip existing tables).")
+    ap.add_argument("--hudi-layouts", default="no_layout,linear,zorder,hilbert",
+                    help="Comma-separated Hudi layouts to materialise (default: no_layout,linear,zorder,hilbert).")
+    ap.add_argument("--hudi-table-config", default="",
+                    help="Optional JSON file overriding per-table Hudi configs.")
 
     # Iceberg specific
     ap.add_argument("--iceberg-catalog", default="tpchall",
@@ -97,11 +102,15 @@ def write_delta(df: DataFrame, dst: Path, overwrite: bool) -> None:
     df.write.format("delta").mode(mode).save(str(dst_abs))
 
 
-def write_hudi(df: DataFrame, table: str, dst: Path, spec: Dict, overwrite: bool) -> None:
+def write_hudi(df: DataFrame, table: str, layout: str, cfg: Dict, dst: Path, overwrite: bool) -> None:
     dst_abs = dst.expanduser().resolve()
     ensure_local_dir(dst_abs.parent)
-    record_keys = spec["hudi"]["record_key"]
-    partition_field = spec["hudi"]["partition_field"]
+    record_keys = cfg["record_key"]
+    partition_field = cfg.get("partition_field", "")
+    sort_columns = cfg.get("sort_columns", [])
+    if sort_columns:
+        df = df.sort(sort_columns)
+
     if len(record_keys) > 1:
         keygen = "org.apache.hudi.keygen.ComplexKeyGenerator"
     else:
@@ -109,11 +118,11 @@ def write_hudi(df: DataFrame, table: str, dst: Path, spec: Dict, overwrite: bool
             "org.apache.hudi.keygen.NonpartitionedKeyGenerator"
 
     hudi_conf = {
-        "hoodie.table.name": f"tpch_all_{table}",
+        "hoodie.table.name": f"tpch_all_{table}_{layout}",
         "hoodie.datasource.write.table.type": "COPY_ON_WRITE",
         "hoodie.datasource.write.operation": "bulk_insert",
         "hoodie.datasource.write.recordkey.field": ",".join(record_keys),
-        "hoodie.datasource.write.precombine.field": spec["hudi"]["precombine_field"],
+        "hoodie.datasource.write.precombine.field": cfg["precombine_field"],
         "hoodie.datasource.write.partitionpath.field": partition_field,
         "hoodie.datasource.write.keygenerator.class": keygen,
         "hoodie.datasource.hive_sync.enable": "false",
@@ -146,10 +155,55 @@ def write_iceberg(
 
 def main():
     args = parse_args()
+    hudi_layouts = [l.strip() for l in args.hudi_layouts.replace(",", " ").split() if l.strip()]
     wanted_tables = [t.strip() for t in args.tables.replace(",", " ").split() if t.strip()]
     engines = [e.strip().lower() for e in args.engines.replace(",", " ").split() if e.strip()]
     data_root = Path(args.data_root)
     src_root = Path(args.source)
+
+    # Hudi layout-aware configs (defaults fall back to tpch_all_schemas)
+    HUDI_TABLE_CONFIGS = {
+        "lineitem": {
+            "record_key": ["l_orderkey", "l_linenumber"],
+            "precombine_field": "l_commitdate",
+            "partition_field": "l_returnflag,l_linestatus",
+            "sort_columns": ["l_shipdate", "l_receiptdate"],
+        },
+        "orders": {
+            "record_key": ["o_orderkey"],
+            "precombine_field": "o_orderdate",
+            "partition_field": "o_orderstatus,o_orderpriority",
+            "sort_columns": ["o_orderdate", "o_custkey"],
+        },
+    }
+
+    if args.hudi_table_config:
+        config_path = Path(args.hudi_table_config)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Hudi table config not found: {config_path}")
+        with config_path.open() as f:
+            overrides = json.load(f)
+        if not isinstance(overrides, dict):
+            raise ValueError("Hudi table config JSON must be an object keyed by table name.")
+        for tbl, cfg in overrides.items():
+            if not isinstance(cfg, dict):
+                continue
+            HUDI_TABLE_CONFIGS[tbl] = {
+                "record_key": cfg.get("record_key", HUDI_TABLE_CONFIGS.get(tbl, {}).get("record_key", TPCH_TABLES.get(tbl, {}).get("hudi", {}).get("record_key", []))),
+                "precombine_field": cfg.get("precombine_field", HUDI_TABLE_CONFIGS.get(tbl, {}).get("precombine_field", "")),
+                "partition_field": cfg.get("partition_field", HUDI_TABLE_CONFIGS.get(tbl, {}).get("partition_field", "")),
+                "sort_columns": cfg.get("sort_columns", HUDI_TABLE_CONFIGS.get(tbl, {}).get("sort_columns", [])),
+            }
+
+    def hudi_config_for(table: str) -> Dict:
+        base = TPCH_TABLES[table]["hudi"]
+        cfg = HUDI_TABLE_CONFIGS.get(table, {})
+        return {
+            "record_key": cfg.get("record_key", base["record_key"]),
+            "precombine_field": cfg.get("precombine_field", base["precombine_field"]),
+            "partition_field": cfg.get("partition_field", base["partition_field"]),
+            "sort_columns": cfg.get("sort_columns", []),
+        }
 
     spark = build_spark(args)
     try:
@@ -166,9 +220,11 @@ def main():
                 write_delta(df, dst, args.overwrite)
 
             if "hudi" in engines:
-                dst = data_root / "hudi" / table
-                print(f"  -> Hudi: {dst}")
-                write_hudi(df, table, dst, TPCH_TABLES[table], args.overwrite)
+                cfg = hudi_config_for(table)
+                for layout in hudi_layouts:
+                    dst = data_root / "hudi" / layout / table
+                    print(f"  -> Hudi: {dst} (layout={layout})")
+                    write_hudi(df, table, layout, cfg, dst, args.overwrite)
 
             if "iceberg" in engines:
                 print(f"  -> Iceberg: {args.iceberg_catalog}.{args.iceberg_namespace}.{table}")

@@ -82,6 +82,8 @@ def parse_args() -> argparse.Namespace:
                     help="REST wait window for metrics.")
     ap.add_argument("--rest-poll-ms", type=int, default=250,
                     help="REST polling interval.")
+    ap.add_argument("--hudi-layout", default="no_layout",
+                    help="Hudi layout name (subdir under data-root/hudi). Default: no_layout.")
 
     # Iceberg specifics
     ap.add_argument("--iceberg-catalog", default="tpchall",
@@ -143,12 +145,18 @@ def register_tables(spark: SparkSession, args: argparse.Namespace, data_root: Pa
         fmt = "delta"
         for table in TABLE_LIST:
             path = (data_root / "delta" / table).expanduser().resolve()
-            spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
+            if path.exists():
+                spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
+            else:
+                print(f"[WARN] Delta table missing, skipping: {path}")
     elif args.engine == "hudi":
         fmt = "hudi"
         for table in TABLE_LIST:
-            path = (data_root / "hudi" / table).expanduser().resolve()
-            spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
+            path = (data_root / "hudi" / args.hudi_layout / table).expanduser().resolve()
+            if path.exists():
+                spark.read.format(fmt).load(str(path)).createOrReplaceTempView(table)
+            else:
+                print(f"[WARN] Hudi table missing, skipping: {path}")
     else:  # iceberg
         catalog = args.iceberg_catalog
         namespace = args.iceberg_namespace
