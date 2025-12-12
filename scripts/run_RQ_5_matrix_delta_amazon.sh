@@ -130,7 +130,9 @@ for scenario_var in "${SCENARIOS[@]}"; do
         --tag "scenario=${name}" )
 
   read -r -a query_args <<<"$query_args_str"
-  cmd+=(-- "${query_args[@]}")
+  if [[ ${#query_args[@]} -gt 0 ]]; then
+    cmd+=("${query_args[@]}")
+  fi
 
   DELTA_LAYOUTS="$layouts" bash "${cmd[@]}"
 
