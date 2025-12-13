@@ -15,7 +15,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_SCRIPT="${ROOT_DIR}/scripts/run_RQ_1.sh"
 START_AFTER_SPEC="${RQ2_START_AFTER:-}"
 START_AFTER_CONSUMED=0
-DEFAULT_RQ2_QUERY_ARGS="--spec-dir workload_spec/tpch_rq2 --spec-glob spec_tpch_RQ2_*.yaml --workload-type custom --output-root workloads/tpch_rq2"
+DEFAULT_RQ2_QUERY_ARGS="--spec-dir workload_spec/tpch_rq2 --spec-glob spec_tpch_RQ2_*_C1_N3_O1.yaml --workload-type custom --output-root workloads/tpch_rq2"
 
 [[ -x "$RUN_SCRIPT" ]] || { echo "Missing run script: $RUN_SCRIPT" >&2; exit 1; }
 
@@ -235,8 +235,6 @@ declare -A RQ2_SCENARIO_O4_V1=(
   [target_mb]="128"
 )
 
-
-
 # declare -A SCENARIO_ALT_SORT=(
 #   [name]="shipdate_only"
 #   [scales]="16"
@@ -246,8 +244,8 @@ declare -A RQ2_SCENARIO_O4_V1=(
 #   [query_args]="--spec spec_tpch_RQ2_Q1_S1_C1_N2_O1.yaml --skip-run"
 # )
 
+# SCENARIOS=(RQ2_SCENARIO_DEFAULT_V5 RQ2_SCENARIO_O2_V1 RQ2_SCENARIO_O2_V2 RQ2_SCENARIO_O2_V3 RQ2_SCENARIO_O2_V4 RQ2_SCENARIO_O2_V5 RQ2_SCENARIO_O2_V6 RQ2_SCENARIO_O3_V1 RQ2_SCENARIO_O3_V2 RQ2_SCENARIO_O4_V1)
 SCENARIOS=(RQ2_SCENARIO_DEFAULT RQ2_SCENARIO_DEFAULT_V1 RQ2_SCENARIO_DEFAULT_V2 RQ2_SCENARIO_DEFAULT_V3 RQ2_SCENARIO_DEFAULT_V4 RQ2_SCENARIO_DEFAULT_V5 RQ2_SCENARIO_O2_V1 RQ2_SCENARIO_O2_V2 RQ2_SCENARIO_O2_V3 RQ2_SCENARIO_O2_V4 RQ2_SCENARIO_O2_V5 RQ2_SCENARIO_O2_V6 RQ2_SCENARIO_O3_V1 RQ2_SCENARIO_O3_V2 RQ2_SCENARIO_O4_V1)
-# SCENARIOS=(RQ2_SCENARIO_AMAZON_DEFAULT RQ2_SCENARIO_AMAZON_DEFAULT_V1 RQ2_SCENARIO_AMAZON_O2_V1 RQ2_SCENARIO_AMAZON_O2_V2 RQ2_SCENARIO_AMAZON_O3_V1 RQ2_SCENARIO_AMAZON_O3_V2)
 
 # ---------------------------------------------------------------------------
 
