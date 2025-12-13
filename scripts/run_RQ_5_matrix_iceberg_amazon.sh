@@ -117,9 +117,12 @@ for scenario_var in "${SCENARIOS[@]}"; do
   layouts="${scenario[layouts]:-baseline,linear,zorder}"
   dataset_name="${scenario[dataset_name]:-amazon}"
   output_root="${scenario[output_root]:-${ROOT_DIR}/workloads/rq5_iceberg/${name}}"
-  query_args_str="${scenario[query_args]:---workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml}"
+  query_args_str="${scenario[query_args]:---workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml}"
 
   echo "===== Running scenario: $name (Iceberg) ====="
+
+  echo "[LOAD] Writing Amazon data for scenario=${name} (Iceberg layouts=${layouts})"
+  ICEBERG_LAYOUTS="$layouts" bash "${ROOT_DIR}/scripts/run_amazon_write.sh" --iceberg --overwrite
 
   cmd=( "$RUN_SCRIPT"
         --workload-type "amazon"
@@ -136,6 +139,8 @@ for scenario_var in "${SCENARIOS[@]}"; do
 
   ICEBERG_LAYOUTS="$layouts" bash "${cmd[@]}"
 
+  echo "[CLEAN] Removing generated Amazon data for scenario=${name}"
+  bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --amazon
   clean_spark_eventlogs
 done
 
