@@ -83,7 +83,7 @@ declare -A SCENARIO_RQ3_O2_V2=(
   [skip_query]=0
 )
 
-SCENARIOS=(SCENARIO_RQ3_DEFAULT, SCENARIO_RQ3_O2_V1, SCENARIO_RQ3_O2_V2)
+SCENARIOS=(SCENARIO_RQ3_DEFAULT SCENARIO_RQ3_O2_V1 SCENARIO_RQ3_O2_V2)
 
 # ---------------------------------------------------------------------------
 

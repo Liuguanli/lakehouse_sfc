@@ -31,7 +31,7 @@ declare -A SCENARIO_DEFAULT=(
   [sort]="l_shipdate,l_receiptdate"
   [target_mb]="128"
   [skip_load]=1
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_DEFAULT"
 )
 
@@ -43,7 +43,7 @@ declare -A SCENARIO_DEFAULT_V1=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_receiptdate,l_shipdate"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_DEFAULT_V1"
 )
 
@@ -55,7 +55,7 @@ declare -A SCENARIO_O2_V1=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_commitdate,l_suppkey"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O2_V1"
 )
 
@@ -67,7 +67,7 @@ declare -A SCENARIO_O2_V2=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_suppkey,l_commitdate"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O2_V2"
 )
 
@@ -79,7 +79,7 @@ declare -A SCENARIO_O3_V1=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_orderkey,l_suppkey"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O3_V1"
 )
 
@@ -91,7 +91,7 @@ declare -A SCENARIO_O3_V2=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_suppkey,l_orderkey"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O3_V2"
 )
 
@@ -103,7 +103,7 @@ declare -A SCENARIO_O4_V1=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_extendedprice,l_quantity"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O4_V1"
 )
 
@@ -115,7 +115,7 @@ declare -A SCENARIO_O4_V2=(
   [partition]="l_returnflag,l_linestatus"
   [sort]="l_quantity,l_extendedprice"
   [target_mb]="128"
-  [query_args]="--spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*_C1_N2_O1.yaml"
+  [query_args]="--spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml"
   [output_root]="workloads/tpch_rq5_iceberg/SCENARIO_O4_V2"
 )
 
@@ -129,7 +129,7 @@ for scenario_var in "${SCENARIOS[@]}"; do
   layouts="${scenario[layouts]:-baseline,linear,zorder}"
   dataset_name="${scenario[dataset_name]:-tpch_16}"
   output_root="${scenario[output_root]:-${ROOT_DIR}/workloads/rq5_iceberg/${name}}"
-  query_args_str="${scenario[query_args]:---spec-dir workload_spec/tpch_rq1 --spec-glob spec_tpch_RQ1_*.yaml}"
+  query_args_str="${scenario[query_args]:---spec-dir workload_spec/tpch_rq5 --spec-glob spec_tpch_RQ5_*.yaml}"
 
   echo "===== Running scenario: $name (Iceberg) ====="
 
@@ -142,7 +142,9 @@ for scenario_var in "${SCENARIOS[@]}"; do
         --tag "scenario=${name}" )
 
   read -r -a query_args <<<"$query_args_str"
-  cmd+=(-- "${query_args[@]}")
+  if [[ ${#query_args[@]} -gt 0 ]]; then
+    cmd+=("${query_args[@]}")
+  fi
 
   ICEBERG_LAYOUTS="$layouts" bash "${cmd[@]}"
 
