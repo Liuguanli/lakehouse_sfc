@@ -134,8 +134,11 @@ for scenario_var in "${SCENARIOS[@]}"; do
 
   echo "===== Running scenario: $name (Delta) ====="
 
+  echo "[CLEAN] Removing any existing TPCH Delta data for scales=16"
+  bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --scales "16"
+
   echo "[LOAD] Writing TPCH data for scenario=${name} (layouts=${layouts})"
-  DELTA_LAYOUTS="$layouts" bash "${ROOT_DIR}/scripts/load_data_spec/run_delta_layouts_tpch.sh" --scales "16" --overwrite
+  DELTA_LAYOUTS="$layouts" bash "${ROOT_DIR}/scripts/load_data_spec/run_delta_layouts_tpch.sh" --scales "16"
 
   cmd=( "$RUN_SCRIPT"
         --workload-type "tpch"
