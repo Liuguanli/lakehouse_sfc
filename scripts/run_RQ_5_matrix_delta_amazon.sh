@@ -30,7 +30,7 @@ declare -A SCENARIO_AMAZON_DEFAULT=(
   [sort]="asin,parent_asin"
   [target_mb]="128"
   [skip_load]=1
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_default"
   [dataset_name]="amazon"
 )
@@ -43,7 +43,7 @@ declare -A SCENARIO_AMAZON_DEFAULT_V1=(
   [partition]="category"
   [sort]="parent_asin,asin"
   [target_mb]="128"
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_default_v1"
   [dataset_name]="amazon"
 )
@@ -56,7 +56,7 @@ declare -A SCENARIO_AMAZON_O2_V1=(
   [partition]="category"
   [sort]="asin,user_id"
   [target_mb]="128"
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_sort_variant_o2_v1"
   [dataset_name]="amazon"
 )
@@ -69,7 +69,7 @@ declare -A SCENARIO_AMAZON_O2_V2=(
   [partition]="category"
   [sort]="user_id,asin"
   [target_mb]="128"
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_sort_variant_o2_v2"
   [dataset_name]="amazon"
 )
@@ -82,7 +82,7 @@ declare -A SCENARIO_AMAZON_O3_V1=(
   [partition]="category"
   [sort]="user_id,record_timestamp"
   [target_mb]="128"
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_sort_variant_o3_v1"
   [dataset_name]="amazon"
 )
@@ -95,7 +95,7 @@ declare -A SCENARIO_AMAZON_O3_V2=(
   [partition]="category"
   [sort]="record_timestamp,user_id"
   [target_mb]="128"
-  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/amazon_rq5 --spec-glob spec_amazon_RQ5_*.yaml --stats-file workloads/stats/amazon_stats.yaml"
   [output_root]="workloads/amazon_rq5_delta/amazon_sort_variant_o3_v2"
   [dataset_name]="amazon"
 )
