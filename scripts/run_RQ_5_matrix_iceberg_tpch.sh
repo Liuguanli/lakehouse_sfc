@@ -133,6 +133,9 @@ for scenario_var in "${SCENARIOS[@]}"; do
 
   echo "===== Running scenario: $name (Iceberg) ====="
 
+  echo "[LOAD] Writing TPCH data for scenario=${name} (Iceberg layouts=${layouts})"
+  ICEBERG_LAYOUTS="$layouts" bash "${ROOT_DIR}/scripts/load_data_spec/run_iceberg_layouts_tpch.sh" --scales "16" --overwrite
+
   cmd=( "$RUN_SCRIPT"
         --workload-type "tpch"
         --dataset-name "$dataset_name"
@@ -148,6 +151,8 @@ for scenario_var in "${SCENARIOS[@]}"; do
 
   ICEBERG_LAYOUTS="$layouts" bash "${cmd[@]}"
 
+  echo "[CLEAN] Removing generated TPCH data for scenario=${name}"
+  bash "${ROOT_DIR}/scripts/clean_data.sh" --yes --scales "16"
   clean_spark_eventlogs
 done
 

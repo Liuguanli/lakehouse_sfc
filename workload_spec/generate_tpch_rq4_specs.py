@@ -148,7 +148,7 @@ def build_range_template(
     group_cols = ", ".join(columns)
     if group_by:
         sql_lines = [
-            f"SELECT {group_cols}, COUNT(*) AS cnt FROM {{tbl}}",
+            f"SELECT {group_cols}, COUNT(*) AS cnt FROM {{{{tbl}}}}",
             f"WHERE {conditions[0]}",
         ]
         for cond in conditions[1:]:
@@ -158,7 +158,7 @@ def build_range_template(
             sql_lines.append(f"ORDER BY {ORDER_BY_METRIC}")
     else:
         sql_lines = [
-            f"SELECT {group_cols} FROM {{tbl}}",
+            f"SELECT {group_cols} FROM {{{{tbl}}}}",
             f"WHERE {conditions[0]}",
         ]
         for cond in conditions[1:]:
@@ -205,7 +205,7 @@ def build_point_template(
     if group_by:
         sql = dedent(
             f"""
-            SELECT {column}, COUNT(*) AS cnt FROM {{tbl}}
+            SELECT {column}, COUNT(*) AS cnt FROM {{{{tbl}}}}
             WHERE {column} IN ({', '.join(placeholders)})
             GROUP BY {column}
             {('ORDER BY ' + ORDER_BY_METRIC) if order_by else ''}
@@ -215,7 +215,7 @@ def build_point_template(
     else:
         sql = dedent(
             f"""
-            SELECT {column} FROM {{tbl}}
+            SELECT {column} FROM {{{{tbl}}}}
             WHERE {column} IN ({', '.join(placeholders)})
             {'ORDER BY ' + column if order_by else ''}
             {'LIMIT ' + str(limit) if limit else ''}
