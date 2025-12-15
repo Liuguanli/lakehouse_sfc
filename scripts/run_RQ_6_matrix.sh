@@ -197,17 +197,19 @@ for scenario_var in "${SCENARIOS[@]}"; do
     echo "}"
   } > "$cfg_file"
 
-  bash "$LOAD_SCRIPT" \
-    --engines hudi \
-    --tables "$tables_raw" \
-    --data-root "$DATA_ROOT" \
-    --hudi-layouts "$layouts" \
-    --hudi-table-config "$cfg_file" \
-    --overwrite
-
   for layout in ${layouts//,/ }; do
     layout_trim="${layout// /}"
     [[ -z "$layout_trim" ]] && continue
+
+    # Load one layout at a time to keep memory usage bounded
+    bash "$LOAD_SCRIPT" \
+      --engines hudi \
+      --tables "$tables_raw" \
+      --data-root "$DATA_ROOT" \
+      --hudi-layouts "$layout_trim" \
+      --hudi-table-config "$cfg_file" \
+      --overwrite
+
     out_root="${RESULTS_ROOT}/${name}/${layout_trim}"
     bash "$RUN_QUERIES" \
       --engines hudi \

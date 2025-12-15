@@ -10,6 +10,8 @@ set -euo pipefail
 # This script removes generated data under ./data/tpch_*/ for
 # Delta (./delta), Hudi (./hudi), and Iceberg (./iceberg_wh).
 # bash scripts/clean_data.sh --scales "4" --yes
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}/.."  # anchor deletions to repo root so CWD doesn't matter
 ASSUME_YES=false
 SCALES_FILTER=()
 CLEAN_AMAZON=false

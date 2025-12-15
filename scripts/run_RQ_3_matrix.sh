@@ -138,7 +138,7 @@ declare -A SCENARIO_RQ3_O2_V1_2=(
   [sort]="l_commitdate,l_suppkey"
   [target_mb]="128"
   [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
-  # [start_after]="spec_tpch_RQ3_Q3.yaml"
+  [start_after]="spec_tpch_RQ3_Q2_N2_4_S2_C1_N2_O1.yaml"
   [skip_load]=0
   [skip_query]=0
 )
