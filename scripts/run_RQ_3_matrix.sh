@@ -38,10 +38,55 @@ clean_spark_eventlogs() {
 #   skip_query   : set to 1 to skip query stage
 # ---------------------------------------------------------------------------
 
-declare -A SCENARIO_RQ3_DEFAULT=(
+# declare -A SCENARIO_RQ3_DEFAULT=(
+#   [name]="RQ3_DEFAULT"
+#   [scales]="1,4,64"
+#   [layouts]="no_layout,linear,zorder,hilbert"
+#   [record_key]="l_orderkey,l_linenumber"
+#   [precombine]="l_commitdate"
+#   [partition]="l_returnflag,l_linestatus"
+#   [sort]="l_shipdate,l_receiptdate"
+#   [target_mb]="128"
+#   [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+#   # [start_after]="spec_tpch_RQ3_Q3.yaml"
+#   [skip_load]=0
+#   [skip_query]=0
+# )
+
+# declare -A SCENARIO_RQ3_O2_V1=(
+#   [name]="RQ3_O2_V1"
+#   [scales]="1,4,64"
+#   [layouts]="no_layout,linear,zorder,hilbert"
+#   [record_key]="l_orderkey,l_linenumber"
+#   [precombine]="l_commitdate"
+#   [partition]="l_returnflag,l_linestatus"
+#   [sort]="l_commitdate,l_suppkey"
+#   [target_mb]="128"
+#   [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+#   # [start_after]="spec_tpch_RQ3_Q3.yaml"
+#   [skip_load]=0
+#   [skip_query]=0
+# )
+
+# declare -A SCENARIO_RQ3_O2_V2=(
+#   [name]="RQ3_O2_V2"
+#   [scales]="1,4,64"
+#   [layouts]="no_layout,linear,zorder,hilbert"
+#   [record_key]="l_orderkey,l_linenumber"
+#   [precombine]="l_commitdate"
+#   [partition]="l_returnflag,l_linestatus"
+#   [sort]="l_suppkey,l_commitdate"
+#   [target_mb]="128"
+#   [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+#   # [start_after]="spec_tpch_RQ3_Q3.yaml"
+#   [skip_load]=0
+#   [skip_query]=0
+# )
+
+declare -A SCENARIO_RQ3_DEFAULT_1=(
   [name]="RQ3_DEFAULT"
-  [scales]="1,4,64"
-  [layouts]="no_layout,linear,zorder,hilbert"
+  [scales]="64"
+  [layouts]="no_layout,linear"
   [record_key]="l_orderkey,l_linenumber"
   [precombine]="l_commitdate"
   [partition]="l_returnflag,l_linestatus"
@@ -53,10 +98,25 @@ declare -A SCENARIO_RQ3_DEFAULT=(
   [skip_query]=0
 )
 
-declare -A SCENARIO_RQ3_O2_V1=(
+declare -A SCENARIO_RQ3_DEFAULT_2=(
+  [name]="RQ3_DEFAULT"
+  [scales]="64"
+  [layouts]="zorder,hilbert"
+  [record_key]="l_orderkey,l_linenumber"
+  [precombine]="l_commitdate"
+  [partition]="l_returnflag,l_linestatus"
+  [sort]="l_shipdate,l_receiptdate"
+  [target_mb]="128"
+  [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+  # [start_after]="spec_tpch_RQ3_Q3.yaml"
+  [skip_load]=0
+  [skip_query]=0
+)
+
+declare -A SCENARIO_RQ3_O2_V1_1=(
   [name]="RQ3_O2_V1"
-  [scales]="1,4,64"
-  [layouts]="no_layout,linear,zorder,hilbert"
+  [scales]="64"
+  [layouts]="no_layout,linear"
   [record_key]="l_orderkey,l_linenumber"
   [precombine]="l_commitdate"
   [partition]="l_returnflag,l_linestatus"
@@ -68,10 +128,25 @@ declare -A SCENARIO_RQ3_O2_V1=(
   [skip_query]=0
 )
 
-declare -A SCENARIO_RQ3_O2_V2=(
+declare -A SCENARIO_RQ3_O2_V1_2=(
+  [name]="RQ3_O2_V1"
+  [scales]="64"
+  [layouts]="zorder,hilbert"
+  [record_key]="l_orderkey,l_linenumber"
+  [precombine]="l_commitdate"
+  [partition]="l_returnflag,l_linestatus"
+  [sort]="l_commitdate,l_suppkey"
+  [target_mb]="128"
+  [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+  [start_after]="spec_tpch_RQ3_Q2_N2_4_S2_C1_N2_O1.yaml"
+  [skip_load]=0
+  [skip_query]=0
+)
+
+declare -A SCENARIO_RQ3_O2_V2_1=(
   [name]="RQ3_O2_V2"
-  [scales]="1,4,64"
-  [layouts]="no_layout,linear,zorder,hilbert"
+  [scales]="64"
+  [layouts]="no_layout,linear"
   [record_key]="l_orderkey,l_linenumber"
   [precombine]="l_commitdate"
   [partition]="l_returnflag,l_linestatus"
@@ -83,7 +158,24 @@ declare -A SCENARIO_RQ3_O2_V2=(
   [skip_query]=0
 )
 
-SCENARIOS=(SCENARIO_RQ3_DEFAULT SCENARIO_RQ3_O2_V1 SCENARIO_RQ3_O2_V2)
+declare -A SCENARIO_RQ3_O2_V2_2=(
+  [name]="RQ3_O2_V2"
+  [scales]="64"
+  [layouts]="zorder,hilbert"
+  [record_key]="l_orderkey,l_linenumber"
+  [precombine]="l_commitdate"
+  [partition]="l_returnflag,l_linestatus"
+  [sort]="l_suppkey,l_commitdate"
+  [target_mb]="128"
+  [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+  # [start_after]="spec_tpch_RQ3_Q3.yaml"
+  [skip_load]=0
+  [skip_query]=0
+)
+
+SCENARIOS=(SCENARIO_RQ3_O2_V1_2 SCENARIO_RQ3_O2_V2_1 SCENARIO_RQ3_O2_V2_2)
+# SCENARIOS=(SCENARIO_RQ3_DEFAULT_1 SCENARIO_RQ3_DEFAULT_2 SCENARIO_RQ3_O2_V1_1 SCENARIO_RQ3_O2_V1_2 SCENARIO_RQ3_O2_V2_1 SCENARIO_RQ3_O2_V2_2)
+# SCENARIOS=(SCENARIO_RQ3_DEFAULT SCENARIO_RQ3_O2_V1 SCENARIO_RQ3_O2_V2)
 
 # ---------------------------------------------------------------------------
 
