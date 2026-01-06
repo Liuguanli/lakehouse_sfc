@@ -58,7 +58,7 @@ apply_workload_defaults() {
       local default_root="${ROOT_DIR}/workloads/amazon_rq1"
       STATS_FILE="${ROOT_DIR}/workloads/stats/amazon_stats.yaml"
       local default_dataset="amazon"
-      local default_glob="spec_amazon_RQ1_*.yaml"
+      local default_glob="spec_amazon_RQ1_*_C1.yaml"
       ;;
     custom)
       local default_spec_dir=""

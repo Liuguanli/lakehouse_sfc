@@ -31,7 +31,7 @@ declare -A SCENARIO_RQ7_DEFAULT=(
   [target_mb]="128"
   [batches]=10              # 10% increments of TPCH_4
   [shuffle_seed]=42
-  [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq3 --spec-glob spec_tpch_*.yaml"
+  [query_args]="--workload-type custom --spec-dir workload_spec/tpch_rq7 --spec-glob spec_tpch_*.yaml"
 )
 
 SCENARIOS=(SCENARIO_RQ7_DEFAULT)
