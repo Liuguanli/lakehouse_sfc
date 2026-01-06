@@ -105,36 +105,53 @@ def write_delta(df: DataFrame, dst: Path, overwrite: bool) -> None:
 def write_hudi(df: DataFrame, table: str, layout: str, cfg: Dict, dst: Path, overwrite: bool) -> None:
     dst_abs = dst.expanduser().resolve()
     ensure_local_dir(dst_abs.parent)
-    record_keys = cfg["record_key"]
-    partition_field = cfg.get("partition_field", "")
-    sort_columns = cfg.get("sort_columns", [])
+
+    record_keys = cfg["record_key"]                 # list
+    precombine_field = cfg["precombine_field"]      # str
+    partition_field = cfg.get("partition_field", "")  # str, e.g. "a,b" or ""
+    sort_columns = cfg.get("sort_columns", [])      # list
+
     if sort_columns:
         df = df.sort(sort_columns)
 
-    if len(record_keys) > 1:
-        keygen = "org.apache.hudi.keygen.ComplexKeyGenerator"
+    # 关键改动：按 partition 字段数量选择 key generator
+    partition_fields = [f.strip() for f in partition_field.split(",") if f.strip()]
+
+    if len(partition_fields) == 0:
+        # 无分区
+        keygen = "org.apache.hudi.keygen.NonpartitionedKeyGenerator"
+        partition_path_opt = ""
+    elif len(partition_fields) == 1:
+        # 单字段分区 → SimpleKeyGenerator
+        keygen = "org.apache.hudi.keygen.SimpleKeyGenerator"
+        partition_path_opt = partition_fields[0]
     else:
-        keygen = "org.apache.hudi.keygen.SimpleKeyGenerator" if partition_field else \
-            "org.apache.hudi.keygen.NonpartitionedKeyGenerator"
+        # 多字段分区 → ComplexKeyGenerator
+        keygen = "org.apache.hudi.keygen.ComplexKeyGenerator"
+        partition_path_opt = ",".join(partition_fields)
 
     hudi_conf = {
         "hoodie.table.name": f"tpch_all_{table}_{layout}",
         "hoodie.datasource.write.table.type": "COPY_ON_WRITE",
         "hoodie.datasource.write.operation": "bulk_insert",
         "hoodie.datasource.write.recordkey.field": ",".join(record_keys),
-        "hoodie.datasource.write.precombine.field": cfg["precombine_field"],
-        "hoodie.datasource.write.partitionpath.field": partition_field,
+        "hoodie.datasource.write.precombine.field": precombine_field,
+        "hoodie.datasource.write.partitionpath.field": partition_path_opt,
         "hoodie.datasource.write.keygenerator.class": keygen,
         "hoodie.datasource.hive_sync.enable": "false",
         "hoodie.datasource.write.hive_style_partitioning": "true",
         "hoodie.write.markers.type": "DIRECT",
         "hoodie.timeline.service.enabled": "false",
     }
+
     mode = "overwrite" if overwrite else "errorifexists"
-    (df.write.format("hudi")
-       .options(**hudi_conf)
-       .mode(mode)
-       .save(str(dst_abs)))
+    (
+        df.write
+        .format("hudi")
+        .options(**hudi_conf)
+        .mode(mode)
+        .save(str(dst_abs))
+    )
 
 
 def write_iceberg(

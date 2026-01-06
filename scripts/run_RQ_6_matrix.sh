@@ -18,11 +18,28 @@ STREAMS_LIST="auto"
 ACTION="count"
 TAG=""
 
+# Helper: convert "a,b,c" -> "\"a\",\"b\",\"c\""
+join_json_array() {
+  local csv="$1"
+  local first=1
+  local out=""
+  IFS=',' read -ra parts <<< "$csv"
+  for p in "${parts[@]}"; do
+    p="${p//\"/\\\"}"   # escape double quotes if any
+    if [[ $first -eq 0 ]]; then
+      out+=","
+    fi
+    first=0
+    out+="\"${p}\""
+  done
+  printf '%s' "$out"
+}
+
 # Scenario definitions (each may include multiple tables; per-table configs live here)
 
 declare -A SCENARIO_L1_O1=(
   [name]="lineitem_orders_L1_O1"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -36,7 +53,7 @@ declare -A SCENARIO_L1_O1=(
 
 declare -A SCENARIO_L1_O2=(
   [name]="lineitem_orders_L1_O2"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -50,7 +67,7 @@ declare -A SCENARIO_L1_O2=(
 
 declare -A SCENARIO_L1_O3=(
   [name]="lineitem_orders_L1_O3"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -62,10 +79,9 @@ declare -A SCENARIO_L1_O3=(
   [orders_sort]="o_custkey,o_orderdate"
 )
 
-
 declare -A SCENARIO_L2_O1=(
   [name]="lineitem_orders_L2_O1"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -79,7 +95,7 @@ declare -A SCENARIO_L2_O1=(
 
 declare -A SCENARIO_L2_O2=(
   [name]="lineitem_orders_L2_O2"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -93,7 +109,7 @@ declare -A SCENARIO_L2_O2=(
 
 declare -A SCENARIO_L2_O3=(
   [name]="lineitem_orders_L2_O3"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -105,10 +121,9 @@ declare -A SCENARIO_L2_O3=(
   [orders_sort]="o_custkey,o_orderdate"
 )
 
-
 declare -A SCENARIO_L3_O1=(
   [name]="lineitem_orders_L3_O1"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -122,7 +137,7 @@ declare -A SCENARIO_L3_O1=(
 
 declare -A SCENARIO_L3_O2=(
   [name]="lineitem_orders_L3_O2"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -136,7 +151,7 @@ declare -A SCENARIO_L3_O2=(
 
 declare -A SCENARIO_L3_O3=(
   [name]="lineitem_orders_L3_O3"
-  [tables]="lineitem orders"
+  [tables]="customer orders lineitem supplier nation region part partsupp"
   [layouts]="no_layout,linear,zorder,hilbert"
   [lineitem_record_key]="l_orderkey,l_linenumber"
   [lineitem_precombine]="l_commitdate"
@@ -185,13 +200,31 @@ for scenario_var in "${SCENARIOS[@]}"; do
       pc="${scenario[$pc_key]:-}"
       pt="${scenario[$pt_key]:-}"
       st="${scenario[$st_key]:-}"
-      [[ -z "$rk" || -z "$pc" ]] && { echo "[WARN] Missing config for table=${tbl}, skipping."; continue; }
+
+      # Only write overrides for tables that have explicit configs (lineitem / orders).
+      if [[ -z "$rk" || -z "$pc" ]]; then
+        echo "[WARN] No override for table=${tbl}, using TPCH defaults." >&2
+        continue
+      fi
+
+      rk_json="$(join_json_array "$rk")"
+      if [[ -n "$st" ]]; then
+        st_json="$(join_json_array "$st")"
+      else
+        st_json=""
+      fi
+
       [[ $first -eq 0 ]] && echo ","
       first=0
-      echo -n "  \"${tbl}\": {\"record_key\": [\"${rk//,/\",\"}\"], "
+
+      echo -n "  \"${tbl}\": {\"record_key\": [${rk_json}], "
       echo -n "\"precombine_field\": \"${pc}\", "
       echo -n "\"partition_field\": \"${pt}\", "
-      echo -n "\"sort_columns\": [\"${st//,/\",\"}\"]}"
+      if [[ -n "$st_json" ]]; then
+        echo -n "\"sort_columns\": [${st_json}]}"
+      else
+        echo -n "\"sort_columns\": []}"
+      fi
     done
     echo
     echo "}"
