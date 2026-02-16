@@ -1,0 +1,37 @@
+meta:
+  rq: RQ7
+  query: Q3_K4_1
+  column_config:
+    label: C1_N2_O1
+    columns:
+    - l_shipdate
+    - l_receiptdate
+  selectivity:
+    label: S0
+generation:
+  n: 10
+  mode: random
+  seed: 42
+templates:
+- id: Q3_K4_1
+  sql: |-
+    SELECT l_orderkey FROM {{tbl}}
+    WHERE l_shipdate IN (DATE ':l_shipdate_v1', DATE ':l_shipdate_v2', DATE ':l_shipdate_v3', DATE ':l_shipdate_v4')
+  params:
+    l_shipdate_v1:
+      type: date
+      range: &id001
+      - 694310400000.0
+      - 912470400000.0
+    l_shipdate_v2:
+      type: date
+      range: *id001
+      constraint: l_shipdate_v2 not in {l_shipdate_v1}
+    l_shipdate_v3:
+      type: date
+      range: *id001
+      constraint: l_shipdate_v3 not in {l_shipdate_v1, l_shipdate_v2}
+    l_shipdate_v4:
+      type: date
+      range: *id001
+      constraint: l_shipdate_v4 not in {l_shipdate_v1, l_shipdate_v2, l_shipdate_v3}

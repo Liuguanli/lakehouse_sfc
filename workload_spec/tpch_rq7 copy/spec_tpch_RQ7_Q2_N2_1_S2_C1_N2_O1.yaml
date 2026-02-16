@@ -1,0 +1,51 @@
+meta:
+  rq: RQ7
+  query: Q2_N2_1
+  column_config:
+    label: C1_N2_O1
+    columns:
+    - l_shipdate
+    - l_receiptdate
+  selectivity:
+    label: S2
+    ratio_range:
+    - 0.001
+    - 0.01
+generation:
+  n: 10
+  mode: random
+  seed: 42
+templates:
+- id: Q2_N2_1
+  sql: |-
+    SELECT l_orderkey FROM {{tbl}}
+          WHERE l_shipdate BETWEEN DATE ':l_shipdate_lo' AND DATE ':l_shipdate_hi'
+          AND l_receiptdate BETWEEN DATE ':l_receiptdate_lo' AND DATE ':l_receiptdate_hi'
+  params:
+    l_shipdate_lo:
+      type: date
+    l_shipdate_hi:
+      type: date
+      constraint: l_shipdate_hi >= l_shipdate_lo
+    l_receiptdate_lo:
+      type: date
+    l_receiptdate_hi:
+      type: date
+      constraint: l_receiptdate_hi >= l_receiptdate_lo
+  interval_rules:
+  - column: l_shipdate
+    lo: l_shipdate_lo
+    hi: l_shipdate_hi
+    type: date
+    ratio_range:
+    - 0.001
+    - 0.01
+    clip_to_domain: true
+  - column: l_receiptdate
+    lo: l_receiptdate_lo
+    hi: l_receiptdate_hi
+    type: date
+    ratio_range:
+    - 0.001
+    - 0.01
+    clip_to_domain: true

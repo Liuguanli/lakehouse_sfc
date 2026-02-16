@@ -1,0 +1,37 @@
+meta:
+  rq: RQ7
+  query: Q3_K4_3
+  column_config:
+    label: C1_N2_O1
+    columns:
+    - l_shipdate
+    - l_receiptdate
+  selectivity:
+    label: S0
+generation:
+  n: 10
+  mode: random
+  seed: 42
+templates:
+- id: Q3_K4_3
+  sql: |-
+    SELECT l_orderkey FROM {{tbl}}
+    WHERE l_orderkey IN (:l_orderkey_v1, :l_orderkey_v2, :l_orderkey_v3, :l_orderkey_v4)
+  params:
+    l_orderkey_v1:
+      type: number
+      range: &id001
+      - 196.0
+      - 95999366.0
+    l_orderkey_v2:
+      type: number
+      range: *id001
+      constraint: l_orderkey_v2 not in {l_orderkey_v1}
+    l_orderkey_v3:
+      type: number
+      range: *id001
+      constraint: l_orderkey_v3 not in {l_orderkey_v1, l_orderkey_v2}
+    l_orderkey_v4:
+      type: number
+      range: *id001
+      constraint: l_orderkey_v4 not in {l_orderkey_v1, l_orderkey_v2, l_orderkey_v3}

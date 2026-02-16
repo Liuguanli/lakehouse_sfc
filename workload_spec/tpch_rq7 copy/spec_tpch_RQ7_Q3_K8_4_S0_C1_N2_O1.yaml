@@ -1,0 +1,56 @@
+meta:
+  rq: RQ7
+  query: Q3_K8_4
+  column_config:
+    label: C1_N2_O1
+    columns:
+    - l_shipdate
+    - l_receiptdate
+  selectivity:
+    label: S0
+generation:
+  n: 10
+  mode: random
+  seed: 42
+templates:
+- id: Q3_K8_4
+  sql: |-
+    SELECT l_orderkey FROM {{tbl}}
+    WHERE l_suppkey IN (:l_suppkey_v1, :l_suppkey_v2, :l_suppkey_v3, :l_suppkey_v4, :l_suppkey_v5, :l_suppkey_v6, :l_suppkey_v7, :l_suppkey_v8)
+  params:
+    l_suppkey_v1:
+      type: number
+      range: &id001
+      - 1.0
+      - 160000.0
+    l_suppkey_v2:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v2 not in {l_suppkey_v1}
+    l_suppkey_v3:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v3 not in {l_suppkey_v1, l_suppkey_v2}
+    l_suppkey_v4:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v4 not in {l_suppkey_v1, l_suppkey_v2, l_suppkey_v3}
+    l_suppkey_v5:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v5 not in {l_suppkey_v1, l_suppkey_v2, l_suppkey_v3, l_suppkey_v4}
+    l_suppkey_v6:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v6 not in {l_suppkey_v1, l_suppkey_v2, l_suppkey_v3, l_suppkey_v4,
+        l_suppkey_v5}
+    l_suppkey_v7:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v7 not in {l_suppkey_v1, l_suppkey_v2, l_suppkey_v3, l_suppkey_v4,
+        l_suppkey_v5, l_suppkey_v6}
+    l_suppkey_v8:
+      type: number
+      range: *id001
+      constraint: l_suppkey_v8 not in {l_suppkey_v1, l_suppkey_v2, l_suppkey_v3, l_suppkey_v4,
+        l_suppkey_v5, l_suppkey_v6, l_suppkey_v7}
