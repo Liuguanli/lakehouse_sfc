@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from itertools import combinations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -904,3 +905,301 @@ def example_tpch_file_selection(
     if stream:
         return sorted((root / stream).glob("query_*.sql"))
     return sorted(root.rglob("query_*.sql"))
+
+
+def recommend_layout_tables(
+    summary_enriched: pd.DataFrame,
+    cooccurrence_df: Optional[pd.DataFrame] = None,
+    predicates_df: Optional[pd.DataFrame] = None,
+    min_candidate_columns: int = 2,
+    top_k: int = 8,
+) -> pd.DataFrame:
+    """
+    Rank tables by expected payoff for layout tuning.
+
+    Heuristic: high predicate score + repeated filter usage + co-occurring filter columns
+    indicates a good target for multi-column layout design.
+    """
+    if summary_enriched is None or summary_enriched.empty:
+        return pd.DataFrame()
+
+    rows: List[Dict[str, object]] = []
+    cooccurrence_df = cooccurrence_df if cooccurrence_df is not None else pd.DataFrame()
+    predicates_df = predicates_df if predicates_df is not None else pd.DataFrame()
+
+    for table, g in summary_enriched.groupby("table", sort=True):
+        g = g.copy()
+        # "Candidate" columns: columns that appear in filters or joins and are not trivially useless.
+        cand = g[(g["filters"].fillna(0) > 0) | (g["joins"].fillna(0) > 0)].copy()
+        if "is_unique_like" in cand.columns:
+            # Keep join keys even if unique-like; otherwise unique-like filter cols are usually weak layout anchors.
+            cand = cand[(cand["is_unique_like"] != True) | (cand["joins"].fillna(0) > 0)]  # noqa: E712
+
+        n_candidate_cols = int(cand["column"].nunique()) if not cand.empty else 0
+
+        tbl_pair = cooccurrence_df[cooccurrence_df["table"] == table] if not cooccurrence_df.empty else pd.DataFrame()
+        pair_count_sum = float(tbl_pair["count"].sum()) if not tbl_pair.empty else 0.0
+        pair_count_max = float(tbl_pair["count"].max()) if not tbl_pair.empty else 0.0
+
+        if not predicates_df.empty and "table" in predicates_df.columns:
+            p_tbl = predicates_df[predicates_df["table"] == table]
+            query_coverage = int(p_tbl["query_path"].nunique()) if not p_tbl.empty else 0
+            filter_query_coverage = int(p_tbl[p_tbl["is_filter"] == True]["query_path"].nunique()) if not p_tbl.empty else 0  # noqa: E712
+        else:
+            query_coverage = int(g["queries"].max()) if "queries" in g.columns and not g.empty else 0
+            filter_query_coverage = 0
+
+        total_score = float(g["score"].sum())
+        filter_score = float((g["score"] * g["filters"].fillna(0).clip(lower=0)).sum())
+        filter_events = float(g["filters"].sum()) if "filters" in g.columns else 0.0
+        join_events = float(g["joins"].sum()) if "joins" in g.columns else 0.0
+
+        # Favor tables with strong predicates and actual multi-column opportunities.
+        layout_opportunity_score = (
+            total_score
+            + 0.25 * filter_events
+            + 0.10 * join_events
+            + 0.75 * pair_count_sum
+            + 1.50 * pair_count_max
+        )
+
+        top_cols = (
+            cand.sort_values(["score", "filters", "joins"], ascending=False)
+            .head(5)["column"]
+            .tolist()
+            if not cand.empty
+            else []
+        )
+
+        rows.append(
+            {
+                "table": table,
+                "layout_opportunity_score": layout_opportunity_score,
+                "total_score": total_score,
+                "filter_score_proxy": filter_score,
+                "filter_events": int(filter_events),
+                "join_events": int(join_events),
+                "candidate_columns": n_candidate_cols,
+                "cooccur_pairs": int(len(tbl_pair)) if not tbl_pair.empty else 0,
+                "cooccur_count_sum": pair_count_sum,
+                "cooccur_count_max": pair_count_max,
+                "query_coverage": query_coverage,
+                "filter_query_coverage": filter_query_coverage,
+                "top_columns_preview": ", ".join(top_cols),
+                "eligible_for_multicol_layout": n_candidate_cols >= min_candidate_columns,
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out = out.sort_values(
+        ["eligible_for_multicol_layout", "layout_opportunity_score", "candidate_columns", "query_coverage"],
+        ascending=[False, False, False, False],
+    ).reset_index(drop=True)
+    return out.head(top_k) if top_k and top_k > 0 else out
+
+
+def _column_layout_anchor_score(row: pd.Series) -> float:
+    """
+    Heuristic per-column score for being part of a layout key.
+    Balances predicate score, filter frequency, and distinctness.
+    """
+    base = float(row.get("score", 0.0) or 0.0)
+    filters = float(row.get("filters", 0.0) or 0.0)
+    joins = float(row.get("joins", 0.0) or 0.0)
+    pred_range = float(row.get("range", 0.0) or 0.0)
+    pred_eq = float(row.get("eq", 0.0) or 0.0)
+    pred_in = float(row.get("in", 0.0) or 0.0)
+
+    score = base + 0.5 * filters + 0.25 * joins + 0.4 * pred_range + 0.2 * pred_eq + 0.2 * pred_in
+
+    kind = str(row.get("kind", "") or "").lower()
+    if kind in {"date", "datetime", "datetime64[ns]", "timestamp"}:
+        score *= 1.15
+    elif kind in {"double", "float64", "float32", "int", "int32", "int64", "long", "number", "decimal"}:
+        score *= 1.05
+
+    unique_ratio = row.get("unique_ratio")
+    try:
+        ur = float(unique_ratio) if unique_ratio is not None and not pd.isna(unique_ratio) else None
+    except Exception:
+        ur = None
+
+    if ur is not None:
+        # Too-low cardinality alone is usually weak as a leading layout key.
+        if ur < 1e-4:
+            score *= 0.55
+        elif ur < 1e-3:
+            score *= 0.70
+        elif ur < 1e-2:
+            score *= 0.85
+        elif ur > 0.95 and joins <= 0:
+            # near-unique non-join columns often give poor pruning value
+            score *= 0.75
+    return score
+
+
+def recommend_layout_column_sets(
+    summary_enriched: pd.DataFrame,
+    cooccurrence_df: pd.DataFrame,
+    predicates_df: Optional[pd.DataFrame],
+    table: str,
+    combo_sizes: Sequence[int] = (2, 3),
+    top_n: int = 12,
+    max_candidate_pool: int = 12,
+    min_anchor_score: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Recommend multi-column layout candidates for one table.
+
+    Output rows are column combinations (size 2/3 by default) with a heuristic score and
+    simple evidence features (pair co-occurrence, query coverage).
+    """
+    if summary_enriched is None or summary_enriched.empty:
+        return pd.DataFrame()
+
+    tbl = summary_enriched[summary_enriched["table"] == table].copy()
+    if tbl.empty:
+        return pd.DataFrame()
+
+    # Build candidate pool
+    tbl["anchor_score"] = tbl.apply(_column_layout_anchor_score, axis=1)
+    cand = tbl[(tbl["filters"].fillna(0) > 0) | (tbl["joins"].fillna(0) > 0)].copy()
+    if "is_unique_like" in cand.columns:
+        cand = cand[(cand["is_unique_like"] != True) | (cand["joins"].fillna(0) > 0)]  # noqa: E712
+    cand = cand[cand["anchor_score"] >= min_anchor_score]
+    cand = cand.sort_values(["anchor_score", "score", "filters"], ascending=False).head(max_candidate_pool)
+    if cand.empty or cand["column"].nunique() < 2:
+        return pd.DataFrame()
+
+    # Co-occurrence lookup
+    pair_counts: Dict[Tuple[str, str], float] = {}
+    if cooccurrence_df is not None and not cooccurrence_df.empty:
+        cg = cooccurrence_df[cooccurrence_df["table"] == table].copy()
+        for _, r in cg.iterrows():
+            a, b = sorted([str(r["col_a"]), str(r["col_b"])])
+            pair_counts[(a, b)] = float(r.get("count", 0) or 0)
+
+    # Query coverage lookup per column
+    col_query_sets: Dict[str, set] = {}
+    if predicates_df is not None and not predicates_df.empty:
+        pg = predicates_df[(predicates_df["table"] == table) & (predicates_df["is_filter"] == True)].copy()  # noqa: E712
+        for col, g in pg.groupby("column"):
+            col_query_sets[str(col)] = set(g["query_path"].tolist())
+
+    # Lookup metadata
+    col_meta = cand.set_index("column").to_dict("index")
+    cols = cand["column"].dropna().astype(str).unique().tolist()
+
+    out_rows: List[Dict[str, object]] = []
+    valid_sizes = sorted({int(k) for k in combo_sizes if int(k) >= 2})
+    for k in valid_sizes:
+        if len(cols) < k:
+            continue
+        for combo in combinations(cols, k):
+            combo = tuple(sorted(combo))
+            singleton_score = sum(float(col_meta[c]["anchor_score"]) for c in combo)
+            pair_bonus = 0.0
+            pair_evidence_count = 0
+            for a, b in combinations(combo, 2):
+                cnt = float(pair_counts.get(tuple(sorted((a, b))), 0.0))
+                if cnt > 0:
+                    pair_evidence_count += 1
+                pair_bonus += 1.25 * cnt
+
+            qset = set()
+            for c in combo:
+                qset |= set(col_query_sets.get(c, set()))
+            query_coverage = len(qset)
+
+            # Encourage combos whose first two columns have stronger anchors.
+            ordered = sorted(combo, key=lambda c: float(col_meta[c]["anchor_score"]), reverse=True)
+            leading_strength = float(col_meta[ordered[0]]["anchor_score"]) + 0.6 * float(col_meta[ordered[1]]["anchor_score"])
+
+            combo_score = singleton_score + pair_bonus + 0.75 * query_coverage + 0.15 * leading_strength
+
+            out_rows.append(
+                {
+                    "table": table,
+                    "k": k,
+                    "columns": combo,
+                    "columns_csv": ",".join(combo),
+                    "suggested_order": ",".join(ordered),  # simple default for linear/sort-based layouts
+                    "combo_score": combo_score,
+                    "singleton_score": singleton_score,
+                    "pair_bonus": pair_bonus,
+                    "pair_evidence_edges": pair_evidence_count,
+                    "query_coverage": query_coverage,
+                    "lead_anchor": ordered[0],
+                    "lead_anchor_score": float(col_meta[ordered[0]]["anchor_score"]),
+                    "second_anchor": ordered[1],
+                    "second_anchor_score": float(col_meta[ordered[1]]["anchor_score"]),
+                }
+            )
+
+    out = pd.DataFrame(out_rows)
+    if out.empty:
+        return out
+    out = out.sort_values(
+        ["combo_score", "pair_bonus", "query_coverage", "k"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+    return out.head(top_n) if top_n and top_n > 0 else out
+
+
+def recommend_layout_candidates(
+    result: Dict[str, object],
+    top_tables: int = 5,
+    combo_sizes: Sequence[int] = (2, 3),
+    combos_per_table: int = 8,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Convenience wrapper over `analyze_sql_and_stats(...)` output.
+
+    Returns:
+      - table_recommendations
+      - column_set_recommendations (stacked for selected tables)
+    """
+    summary_enriched = result.get("summary_enriched")
+    cooccurrence = result.get("cooccurrence")
+    predicates = result.get("predicates")
+
+    if not isinstance(summary_enriched, pd.DataFrame):
+        raise TypeError("result['summary_enriched'] must be a DataFrame")
+    if not isinstance(cooccurrence, pd.DataFrame):
+        cooccurrence = pd.DataFrame()
+    if not isinstance(predicates, pd.DataFrame):
+        predicates = pd.DataFrame()
+
+    tbl_rec = recommend_layout_tables(
+        summary_enriched=summary_enriched,
+        cooccurrence_df=cooccurrence,
+        predicates_df=predicates,
+        top_k=top_tables,
+    )
+
+    if tbl_rec.empty or "eligible_for_multicol_layout" not in tbl_rec.columns:
+        return {
+            "table_recommendations": tbl_rec,
+            "column_set_recommendations": pd.DataFrame(),
+        }
+
+    combo_rows = []
+    for table in tbl_rec[tbl_rec["eligible_for_multicol_layout"] == True]["table"].tolist():  # noqa: E712
+        combos = recommend_layout_column_sets(
+            summary_enriched=summary_enriched,
+            cooccurrence_df=cooccurrence,
+            predicates_df=predicates,
+            table=table,
+            combo_sizes=combo_sizes,
+            top_n=combos_per_table,
+        )
+        if not combos.empty:
+            combo_rows.append(combos)
+
+    combo_df = pd.concat(combo_rows, ignore_index=True) if combo_rows else pd.DataFrame()
+    return {
+        "table_recommendations": tbl_rec,
+        "column_set_recommendations": combo_df,
+    }
