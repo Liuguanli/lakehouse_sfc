@@ -23,6 +23,7 @@ Author: you :)
 """
 
 from __future__ import annotations
+import os
 import re
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple, Optional, Dict
@@ -43,6 +44,45 @@ DEFAULT_COLS = [
 ]
 
 FILENAME_RE = re.compile(r"results_(?P<engine>[^_]+)_(?P<layout>[^_]+)_.+\.csv$", re.IGNORECASE)
+
+DEFAULT_OVERLEAF_PDF_DIR = Path(
+    "/Users/guanlil1/Dropbox/应用/Overleaf/When and How to Use Space-Filling Curves for Lakehouse Layout Optimization"
+) / "exp"
+
+
+def _resolve_extra_pdf_dir(extra_pdf_dir: Path | str | None) -> Optional[Path]:
+    """
+    Resolve the extra PDF output directory.
+    Precedence: explicit arg -> OVERLEAF_PDF_DIR env -> DEFAULT_OVERLEAF_PDF_DIR.
+    Set OVERLEAF_PDF_DIR to empty string to disable.
+    """
+    if extra_pdf_dir is not None:
+        return Path(extra_pdf_dir).expanduser()
+
+    env_val = os.environ.get("OVERLEAF_PDF_DIR")
+    if env_val is not None:
+        env_val = env_val.strip()
+        if not env_val:
+            return None
+        return Path(env_val).expanduser()
+
+    return DEFAULT_OVERLEAF_PDF_DIR
+
+
+def _mirror_under_extra_dir(stem: Path, extra_dir: Path, anchor_dir_name: str = "viz_out_results") -> Path:
+    """
+    If `stem` contains the anchor directory name, preserve its relative path under extra_dir.
+    Otherwise, fall back to using stem.name.
+    """
+    try:
+        parts = stem.parts
+        if anchor_dir_name in parts:
+            idx = parts.index(anchor_dir_name)
+            rel = Path(*parts[idx + 1 :]) if idx + 1 < len(parts) else Path(stem.name)
+            return extra_dir / rel
+    except Exception:
+        pass
+    return extra_dir / stem.name
 
 
 def _infer_engine_layout_from_name(csv_path: Path) -> Tuple[Optional[str], Optional[str]]:
@@ -177,14 +217,29 @@ def _ensure_metric(df: pd.DataFrame, metric: str) -> pd.Series:
     return pd.to_numeric(df[metric], errors="coerce")
 
 
-def savefig_multi(fig: plt.Figure, stem: Path | str, fmts: Sequence[str] = ("png", "pdf"), dpi: int = 160) -> None:
+def savefig_multi(
+    fig: plt.Figure,
+    stem: Path | str,
+    fmts: Sequence[str] = ("png", "pdf"),
+    dpi: int = 160,
+    extra_pdf_dir: Path | str | None = None,
+) -> None:
     """
     Save figure to multiple formats without touching rcParams/colors.
+    If PDF is requested, also save a copy to the extra PDF directory.
     """
     stem = Path(stem)
     stem.parent.mkdir(parents=True, exist_ok=True)
+    extra_dir = _resolve_extra_pdf_dir(extra_pdf_dir)
     for f in fmts:
-        fig.savefig(stem.with_suffix("." + f), dpi=dpi, bbox_inches="tight")
+        f_lower = f.lower()
+        out_path = stem.with_suffix("." + f_lower)
+        if f_lower == "pdf" and extra_dir is not None:
+            extra_path = _mirror_under_extra_dir(stem, extra_dir).with_suffix(".pdf")
+            extra_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(extra_path, dpi=dpi, bbox_inches="tight")
+            continue
+        fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
 
 
 # def plot_violin(
