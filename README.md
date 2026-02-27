@@ -41,7 +41,7 @@ nohup bash ./scripts/run_benchmark_tpch_all.sh > tpch_all.log 2>&1 &
 nohup bash ./scripts/run_benchmark_tpch_all.sh > /dev/null 2> tpch_err.log &
 
 
-nohup bash ./scripts/run_RQ_1_matrix.sh > tpch_all.log 2>&1 &
+nohup bash ./scripts/run_RQ_7_matrix.sh > tpch_all.log 2>&1 &
 nohup bash ./scripts/run_RQ_1_matrix.sh > /dev/null 2> tpch_err.log &
 
 bash ./scripts/run_RQ_6_matrix.sh
@@ -54,3 +54,5 @@ ps aux | grep run_RQ_6_matrix.sh
 
 
 kill -9 2196891
+
+ps aux | grep run_RQ_7_matrix.sh

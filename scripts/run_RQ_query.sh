@@ -22,6 +22,8 @@ SPEC_DIR=""
 SPEC_DIR_OVERRIDE=""
 OUTPUT_ROOT=""
 SQL_ROOT=""
+SQL_ROOT_OVERRIDE=""
+SQL_ROOT_OVERRIDDEN=0
 STATS_FILE=""
 DATASET=""
 RUNNER="${ROOT_DIR}/scripts/run_query.sh"
@@ -76,7 +78,11 @@ apply_workload_defaults() {
   SPEC_DIR="${SPEC_DIR_OVERRIDE:-$default_spec_dir}"
   local root_choice="${CUSTOM_OUTPUT_ROOT:-$default_root}"
   OUTPUT_ROOT="$root_choice"
-  SQL_ROOT="${OUTPUT_ROOT}/sql"
+  if [[ $SQL_ROOT_OVERRIDDEN -eq 1 ]]; then
+    SQL_ROOT="$SQL_ROOT_OVERRIDE"
+  else
+    SQL_ROOT="${OUTPUT_ROOT}/sql"
+  fi
   DATASET="${DATASET_NAME_OVERRIDE:-$default_dataset}"
   if [[ $STATS_FILE_OVERRIDDEN -eq 1 ]]; then
     STATS_FILE="$STATS_FILE_OVERRIDE"
@@ -105,6 +111,7 @@ run_RQ_query.sh [options] [-- extra run_query.sh args]
   --iceberg-layouts LIST      Override iceberg layouts passed downstream
   --spec-dir DIR              Override spec directory (default depends on workload)
   --output-root DIR           Override output directory (default depends on workload)
+  --sql-root DIR              Override SQL cache directory (default: <output-root>/sql)
   --workload-type NAME        Workload type: tpch (default) or amazon
   --dataset-name NAME         Dataset identifier passed to run_query.sh
 EOF
@@ -138,6 +145,8 @@ while [[ $# -gt 0 ]]; do
       SPEC_DIR_OVERRIDE="$2"; shift 2;;
     --output-root)
       CUSTOM_OUTPUT_ROOT="$2"; shift 2;;
+    --sql-root)
+      SQL_ROOT_OVERRIDE="$2"; SQL_ROOT_OVERRIDDEN=1; shift 2;;
     --workload-type)
       WORKLOAD_KIND="$2"; shift 2;;
     --dataset-name)
