@@ -29,6 +29,7 @@ Note.md
 TODO.md
 
 /spark-warehouse/
+/.ivy2/
 tmp/
 __pycache__/
 *.pyc

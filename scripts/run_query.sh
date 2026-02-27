@@ -25,6 +25,7 @@ RUN_ICEBERG=0
 HUDI_LAYOUTS="${HUDI_LAYOUTS:-no_layout,linear,zorder,hilbert}"
 DELTA_LAYOUTS="${DELTA_LAYOUTS:-baseline,linear,zorder}"
 ICEBERG_LAYOUTS="${ICEBERG_LAYOUTS:-baseline,linear,zorder}"
+RESULT_FILE_SUFFIX="${RESULT_FILE_SUFFIX:-}"
 declare -a RUN_TAGS=()
 
 # ---------- Parse optional engine flags ----------
@@ -81,9 +82,12 @@ ROOT="$(pwd)"
 ICEBERG_WH="${ROOT}/data/${DATASET}/iceberg_wh"
 HUDI_ROOT="${ROOT}/data/${DATASET}/hudi"
 DELTA_ROOT="${ROOT}/data/${DATASET}/delta"
+SPARK_JARS_IVY="${SPARK_JARS_IVY:-${ROOT}/.ivy2}"
+mkdir -p "$SPARK_JARS_IVY"
 
 WORKLOAD_NAME="$(basename "$WORKLOAD_DIR")"
 TS="$(date +%Y%m%d_%H%M%S)"
+RESULTS_SUBDIR_OVERRIDE="${RESULTS_SUBDIR_OVERRIDE:-}"
 tag_suffix=""
 if [[ ${#RUN_TAGS[@]} -gt 0 ]]; then
   sanitize_tag() {
@@ -106,8 +110,13 @@ if [[ ${#RUN_TAGS[@]} -gt 0 ]]; then
     tag_suffix="__${tag_join}"
   fi
 fi
-RESULTS_DIR="results/${WORKLOAD_NAME}/${TS}${tag_suffix}"
-LOG_DIR="log/${DATASET}/${WORKLOAD_NAME}/${TS}${tag_suffix}"
+if [[ -n "$RESULTS_SUBDIR_OVERRIDE" ]]; then
+  RESULTS_DIR="results/${WORKLOAD_NAME}/${RESULTS_SUBDIR_OVERRIDE}"
+  LOG_DIR="log/${DATASET}/${WORKLOAD_NAME}/${RESULTS_SUBDIR_OVERRIDE}"
+else
+  RESULTS_DIR="results/${WORKLOAD_NAME}/${TS}${tag_suffix}"
+  LOG_DIR="log/${DATASET}/${WORKLOAD_NAME}/${TS}${tag_suffix}"
+fi
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 
 echo "DATASET     = $DATASET"
@@ -121,6 +130,7 @@ COMMON_CONF=(
   --conf spark.driver.memory=16g
   --conf spark.executor.memory=16g
   --conf spark.executor.memoryOverhead=4g
+  --conf "spark.jars.ivy=${SPARK_JARS_IVY}"
 )
 
 # ============================================================
@@ -137,6 +147,10 @@ ICEBERG_CONF=(
 run_iceberg() {
   local layout="$1"  # baseline | linear | zorder
   local table="local.demo.events_iceberg_${layout}"
+  local out_csv="${RESULTS_DIR}/results_iceberg_${layout}_${WORKLOAD_NAME}.csv"
+  if [[ -n "$RESULT_FILE_SUFFIX" ]]; then
+    out_csv="${RESULTS_DIR}/results_iceberg_${layout}_${WORKLOAD_NAME}_${RESULT_FILE_SUFFIX}.csv"
+  fi
   "$SPARK_HOME/bin/spark-submit" \
     --packages "$ICEBERG_PKGS" \
     "${ICEBERG_CONF[@]}" \
@@ -146,7 +160,7 @@ run_iceberg() {
       --table "$table" \
       --queries_dir "$WORKLOAD_DIR" \
       --warmup --cache none --action count \
-      --output_csv "${RESULTS_DIR}/results_iceberg_${layout}_${WORKLOAD_NAME}.csv"
+      --output_csv "$out_csv"
 }
 
 # ============================================================
@@ -167,6 +181,10 @@ run_delta() {
     zorder)   table_path="${DELTA_ROOT}/delta_zorder" ;;
     *) echo "Unknown delta layout: $layout" >&2; exit 1 ;;
   esac
+  local out_csv="${RESULTS_DIR}/results_delta_${layout}_${WORKLOAD_NAME}.csv"
+  if [[ -n "$RESULT_FILE_SUFFIX" ]]; then
+    out_csv="${RESULTS_DIR}/results_delta_${layout}_${WORKLOAD_NAME}_${RESULT_FILE_SUFFIX}.csv"
+  fi
   "$SPARK_HOME/bin/spark-submit" \
     --packages "$DELTA_PKGS" \
     "${DELTA_CONF[@]}" \
@@ -176,7 +194,7 @@ run_delta() {
       --table "$table_path" \
       --queries_dir "$WORKLOAD_DIR" \
       --warmup --cache none --action count \
-      --output_csv "${RESULTS_DIR}/results_delta_${layout}_${WORKLOAD_NAME}.csv"
+      --output_csv "$out_csv"
 }
 
 # ============================================================
@@ -187,6 +205,10 @@ HUDI_PKGS="org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.2"
 run_hudi() {
   local layout="$1"  # no_layout | linear | zorder | hilbert
   local table_path="${HUDI_ROOT}/hudi_${layout}"
+  local out_csv="${RESULTS_DIR}/results_hudi_${layout}_${WORKLOAD_NAME}.csv"
+  if [[ -n "$RESULT_FILE_SUFFIX" ]]; then
+    out_csv="${RESULTS_DIR}/results_hudi_${layout}_${WORKLOAD_NAME}_${RESULT_FILE_SUFFIX}.csv"
+  fi
   "$SPARK_HOME/bin/spark-submit" \
     --packages "$HUDI_PKGS" \
     "${COMMON_CONF[@]}" \
@@ -195,7 +217,7 @@ run_hudi() {
       --table "$table_path" \
       --queries_dir "$WORKLOAD_DIR" \
       --warmup --cache none --action count \
-      --output_csv "${RESULTS_DIR}/results_hudi_${layout}_${WORKLOAD_NAME}.csv"
+      --output_csv "$out_csv"
 }
 
 # ============================================================
