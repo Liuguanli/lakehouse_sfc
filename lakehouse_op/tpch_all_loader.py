@@ -110,9 +110,20 @@ def write_hudi(df: DataFrame, table: str, layout: str, cfg: Dict, dst: Path, ove
     precombine_field = cfg["precombine_field"]      # str
     partition_field = cfg.get("partition_field", "")  # str, e.g. "a,b" or ""
     sort_columns = cfg.get("sort_columns", [])      # list
+    raw_layout_strategy = cfg.get("layout_strategy", "").strip()
 
-    if sort_columns:
-        df = df.sort(sort_columns)
+    layout_norm = layout.strip().lower()
+    strategy_map = {
+        "linear": "linear",
+        "zorder": "z-order",
+        "z-order": "z-order",
+        "hilbert": "hilbert",
+    }
+    layout_enable = layout_norm != "no_layout"
+    layout_strategy = raw_layout_strategy or strategy_map.get(layout_norm, "")
+    if layout_enable and not sort_columns:
+        # Fallback: keep clustering deterministic if scenario forgot sort columns.
+        sort_columns = record_keys
 
     # 关键改动：按 partition 字段数量选择 key generator
     partition_fields = [f.strip() for f in partition_field.split(",") if f.strip()]
@@ -138,18 +149,41 @@ def write_hudi(df: DataFrame, table: str, layout: str, cfg: Dict, dst: Path, ove
         "hoodie.datasource.write.precombine.field": precombine_field,
         "hoodie.datasource.write.partitionpath.field": partition_path_opt,
         "hoodie.datasource.write.keygenerator.class": keygen,
-        "hoodie.datasource.hive_sync.enable": "false",
-        "hoodie.datasource.write.hive_style_partitioning": "true",
-        "hoodie.write.markers.type": "DIRECT",
-        "hoodie.timeline.service.enabled": "false",
+        # "hoodie.datasource.hive_sync.enable": "false",
+        # "hoodie.datasource.write.hive_style_partitioning": "true",
+        # "hoodie.write.markers.type": "DIRECT",
+        # "hoodie.timeline.service.enabled": "false",
+        # Clustering knobs: shared defaults for all layouts.
+        "hoodie.clustering.inline": os.getenv("HUDI_CLUSTERING_INLINE", "true"),
+        "hoodie.clustering.inline.max.commits": os.getenv("HUDI_CLUSTERING_MAX_COMMITS", "1"),
+        "hoodie.clustering.plan.strategy.small.file.limit": os.getenv(
+            "HUDI_CLUSTERING_SMALL_FILE_LIMIT", str(256 * 1024 * 1024)
+        ),
+        "hoodie.clustering.plan.strategy.target.file.max.bytes": os.getenv(
+            "HUDI_CLUSTERING_TARGET_FILE_MAX_BYTES", str(256 * 1024 * 1024)
+        ),
+        "hoodie.clustering.plan.strategy.max.num.groups": os.getenv(
+            "HUDI_CLUSTERING_MAX_NUM_GROUPS", "4096"
+        ),
     }
 
-    mode = "overwrite" if overwrite else "errorifexists"
+    if layout_enable and layout_strategy:
+        hudi_conf.update({
+            "hoodie.clustering.plan.strategy.sort.columns": ",".join(sort_columns),
+            "hoodie.clustering.layout.optimize.enable": "true",
+            "hoodie.clustering.layout.optimize.strategy": layout_strategy,
+        })
+    else:
+        # no_layout: no layout optimization and no explicit ordering columns.
+        hudi_conf["hoodie.clustering.layout.optimize.enable"] = "false"
+        hudi_conf["hoodie.clustering.inline"] = "false"
+
+    # mode = "overwrite" if overwrite else "errorifexists"
     (
         df.write
         .format("hudi")
         .options(**hudi_conf)
-        .mode(mode)
+        .mode("overwrite")
         .save(str(dst_abs))
     )
 
