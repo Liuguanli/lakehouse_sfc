@@ -93,14 +93,15 @@ for layout in "${LAYOUT_ARR[@]}"; do
   layout_token="${layout_token// /}"
   [[ -z "$layout_token" ]] && continue
   echo "===> Hudi layout=${layout_token}"
-  LAYOUTS="$layout_token" \
-    bash "$CORE_SCRIPT" \
-      --input "$INPUT" \
-      --base-dir "$BASE_DIR" \
-      --record-key "$RECORD_KEY" \
-      --precombine-field "$PRECOMBINE_FIELD" \
-      --partition-field "$PARTITION_FIELD" \
-      --sort-columns "$SORT_COLUMNS" \
-      --target-file-mb "$TARGET_FILE_MB" \
-      "${CORE_EXTRA_ARGS[@]}"
+  echo "===> Hudi layout=${SORT_COLUMNS} sort columns"
+  # LAYOUTS="$layout_token" \
+  #   bash "$CORE_SCRIPT" \
+  #     --input "$INPUT" \
+  #     --base-dir "$BASE_DIR" \
+  #     --record-key "$RECORD_KEY" \
+  #     --precombine-field "$PRECOMBINE_FIELD" \
+  #     --partition-field "$PARTITION_FIELD" \
+  #     --sort-columns "$SORT_COLUMNS" \
+  #     --target-file-mb "$TARGET_FILE_MB" \
+  #     "${CORE_EXTRA_ARGS[@]}"
 done

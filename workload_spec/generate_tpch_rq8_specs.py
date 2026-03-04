@@ -47,8 +47,10 @@ ASPECT_RATIO_FACTORS: Dict[str, Tuple[float, float]] = {
     # A1_1 intentionally omitted: equivalent to RQ1-style symmetric windows.
     "A4_1": (2.0, 0.5),
     "A16_1": (4.0, 0.25),
+    "A64_1": (8.0, 0.125),
     "A1_4": (0.5, 2.0),
     "A1_16": (0.25, 4.0),
+    "A1_64": (0.125, 8.0),
 }
 
 # If both dimensions are date columns, enforce correlated windows instead of
@@ -57,11 +59,11 @@ CORRELATE_DATE_DATE_WINDOWS = True
 
 
 QUERY_DEFS = [
-    {"id": "Q8_N2_1", "columns": ["l_shipdate", "l_receiptdate"]},
+    # {"id": "Q8_N2_1", "columns": ["l_shipdate", "l_receiptdate"]},
     {"id": "Q8_N2_2", "columns": ["l_commitdate", "l_suppkey"]},
-    {"id": "Q8_N2_3", "columns": ["l_extendedprice", "l_quantity"]},
+    # {"id": "Q8_N2_3", "columns": ["l_extendedprice", "l_quantity"]},
     {"id": "Q8_N2_4", "columns": ["l_extendedprice", "l_shipdate"]},
-    {"id": "Q8_N2_5", "columns": ["l_quantity", "l_receiptdate"]},
+    # {"id": "Q8_N2_5", "columns": ["l_quantity", "l_receiptdate"]},
 ]
 
 
@@ -262,7 +264,7 @@ def build_spec(
             },
             "date_date_correlation_applied": bool(date_corr_applied),
         },
-        "generation": {"n": 1000, "mode": "random", "seed": 42},
+        "generation": {"n": 10, "mode": "random", "seed": 42},
         "templates": [template],
     }
 

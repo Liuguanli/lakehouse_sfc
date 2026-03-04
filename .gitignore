@@ -40,6 +40,8 @@ EOF
 .venv/
 # wlg/
 
+*.csv
+
 stats.yaml
 workload.yaml
 examples/demo.sh
