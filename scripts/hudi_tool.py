@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import time
 from collections import Counter, defaultdict
@@ -441,6 +442,282 @@ def infer_sort_cols(existing_cols: list[str], user_cols: list[str]) -> list[str]
     return [c for c in defaults if c in existing_cols]
 
 
+def _cmp_le(a: Any, b: Any) -> bool:
+    try:
+        return a <= b
+    except Exception:
+        return to_text(a) <= to_text(b)
+
+
+def _cmp_ge(a: Any, b: Any) -> bool:
+    try:
+        return a >= b
+    except Exception:
+        return to_text(a) >= to_text(b)
+
+
+def _cmp_lt(a: Any, b: Any) -> bool:
+    try:
+        return a < b
+    except Exception:
+        return to_text(a) < to_text(b)
+
+
+def _cmp_gt(a: Any, b: Any) -> bool:
+    try:
+        return a > b
+    except Exception:
+        return to_text(a) > to_text(b)
+
+
+def _coerce_value(text: str, ref: Any) -> Any:
+    if isinstance(ref, bool):
+        return text.strip().lower() in {"1", "true", "t", "yes", "y"}
+    if isinstance(ref, int) and not isinstance(ref, bool):
+        return int(text)
+    if isinstance(ref, float):
+        return float(text)
+    # keep string for bytes/date/time/decimal-like types
+    return text
+
+
+def _eval_predicate(min_v: Any, max_v: Any, pred: str, v1: Any | None, v2: Any | None) -> tuple[str, str]:
+    if min_v is None or max_v is None:
+        return "unknown", "missing_min_max_stats"
+    if pred == "none":
+        return "unknown", "no_predicate"
+
+    if pred == "prefix":
+        prefix = to_text(v1)
+        low = prefix
+        high = prefix + "\uffff"
+        min_s = to_text(min_v)
+        max_s = to_text(max_v)
+        possible = (max_s >= low) and (min_s <= high)
+        return ("possible", f"[{min_s},{max_s}] intersects prefix={prefix}") if possible else (
+            "impossible",
+            f"[{min_s},{max_s}] disjoint with prefix={prefix}",
+        )
+
+    # numeric / comparable predicates
+    if pred == "eq":
+        possible = _cmp_le(min_v, v1) and _cmp_ge(max_v, v1)
+        return ("possible", f"{min_v} <= {v1} <= {max_v}") if possible else (
+            "impossible",
+            f"{v1} out of [{min_v},{max_v}]",
+        )
+    if pred == "gt":
+        possible = _cmp_gt(max_v, v1)
+        return ("possible", f"max {max_v} > {v1}") if possible else ("impossible", f"max {max_v} <= {v1}")
+    if pred == "ge":
+        possible = _cmp_ge(max_v, v1)
+        return ("possible", f"max {max_v} >= {v1}") if possible else ("impossible", f"max {max_v} < {v1}")
+    if pred == "lt":
+        possible = _cmp_lt(min_v, v1)
+        return ("possible", f"min {min_v} < {v1}") if possible else ("impossible", f"min {min_v} >= {v1}")
+    if pred == "le":
+        possible = _cmp_le(min_v, v1)
+        return ("possible", f"min {min_v} <= {v1}") if possible else ("impossible", f"min {min_v} > {v1}")
+    if pred == "between":
+        lo, hi = v1, v2
+        if _cmp_gt(lo, hi):
+            lo, hi = hi, lo
+        possible = _cmp_ge(max_v, lo) and _cmp_le(min_v, hi)
+        return ("possible", f"[{min_v},{max_v}] intersects [{lo},{hi}]") if possible else (
+            "impossible",
+            f"[{min_v},{max_v}] disjoint with [{lo},{hi}]",
+        )
+    return "unknown", f"unsupported_predicate={pred}"
+
+
+def run_cmd_rowgroup_check(args: argparse.Namespace) -> int:
+    table_root = Path(args.table_root).resolve()
+    if not table_root.exists():
+        print(f"ERROR: table root not found: {table_root}")
+        return 2
+
+    if args.predicate != "none":
+        if args.value is None:
+            print("ERROR: --value is required when --predicate is not 'none'.")
+            return 2
+        if args.predicate == "between" and args.value2 is None:
+            print("ERROR: --value2 is required for --predicate between.")
+            return 2
+
+    candidates: list[Path] = []
+    invalid_candidates = 0
+
+    if args.file:
+        f = Path(args.file)
+        if not f.is_absolute():
+            f = table_root / f
+        chosen = f.resolve()
+        if not chosen.exists():
+            print(f"ERROR: file not found: {chosen}")
+            return 2
+        if args.partition:
+            try:
+                rel = chosen.relative_to(table_root)
+                part = rel.parts[0] if len(rel.parts) > 1 else ""
+                if part != args.partition:
+                    print(
+                        f"ERROR: file partition mismatch, expected `{args.partition}`, got `{part}`"
+                    )
+                    return 2
+            except Exception:
+                print("ERROR: --file must be inside --table-root when --partition is provided.")
+                return 2
+        try:
+            _ = pq.ParquetFile(chosen).metadata
+        except Exception as exc:
+            print(f"ERROR: invalid parquet file: {chosen}")
+            print(f"reason: {exc}")
+            return 2
+        candidates = [chosen]
+    else:
+        files = sorted(iter_parquet_files(table_root))
+        if args.partition:
+            files = [
+                p
+                for p in files
+                if (len(p.relative_to(table_root).parts) > 1)
+                and (p.relative_to(table_root).parts[0] == args.partition)
+            ]
+            if not files:
+                print(
+                    f"ERROR: no parquet files found under partition `{args.partition}` in {table_root}"
+                )
+                return 2
+        if not files:
+            print(f"ERROR: no parquet files under: {table_root}")
+            return 2
+
+        valid_files: list[Path] = []
+        for p in files:
+            try:
+                _ = pq.ParquetFile(p).metadata
+                valid_files.append(p)
+            except Exception:
+                invalid_candidates += 1
+        if not valid_files:
+            print("ERROR: no valid parquet file found (all candidates invalid).")
+            return 2
+
+        if args.all_files:
+            candidates = valid_files[: args.max_files] if args.max_files else valid_files
+        else:
+            rng = random.Random(args.seed)
+            candidates = [rng.choice(valid_files)]
+
+    print(f"table_root={table_root}")
+    if args.partition:
+        print(f"partition={args.partition}")
+    print(f"column={args.column}")
+    print(
+        f"predicate={args.predicate}"
+        + ("" if args.predicate == "none" else f", value={to_text(args.value)}")
+        + ("" if args.predicate != "between" else f", value2={to_text(args.value2)}")
+    )
+    print(f"files_selected={len(candidates)}")
+    if invalid_candidates:
+        print(f"skipped_invalid_candidates={invalid_candidates}")
+    print("")
+
+    overall_possible = 0
+    overall_impossible = 0
+    overall_unknown = 0
+    overall_total = 0
+
+    for fidx, chosen in enumerate(candidates, start=1):
+        pf = pq.ParquetFile(chosen)
+        schema_names = list(pf.schema_arrow.names)
+        if args.column not in schema_names:
+            print(f"[file {fidx}] {chosen}")
+            print(f"  SKIP: column `{args.column}` not in schema")
+            continue
+        col_idx = schema_names.index(args.column)
+
+        # Prepare predicate values using this file's stats type.
+        v1: Any | None = args.value
+        v2: Any | None = args.value2
+        if args.predicate != "none" and args.predicate != "prefix":
+            ref = None
+            for rg_i in range(pf.metadata.num_row_groups):
+                st = pf.metadata.row_group(rg_i).column(col_idx).statistics
+                if st is not None and getattr(st, "has_min_max", False):
+                    ref = st.min
+                    break
+            if ref is not None:
+                try:
+                    v1 = _coerce_value(str(args.value), ref) if args.value is not None else None
+                    if args.value2 is not None:
+                        v2 = _coerce_value(str(args.value2), ref)
+                except Exception as exc:
+                    print(f"[file {fidx}] {chosen}")
+                    print(f"  SKIP: value parse failed: {exc}")
+                    continue
+
+        rel = (
+            str(chosen.relative_to(table_root))
+            if str(chosen).startswith(str(table_root))
+            else str(chosen)
+        )
+        print(f"[file {fidx}] {rel} | row_groups={pf.metadata.num_row_groups}")
+
+        file_possible = 0
+        file_impossible = 0
+        file_unknown = 0
+
+        for rg_i in range(pf.metadata.num_row_groups):
+            rg = pf.metadata.row_group(rg_i)
+            col = rg.column(col_idx)
+            st = col.statistics
+            rows = rg.num_rows
+
+            if st is None or not getattr(st, "has_min_max", False):
+                status, reason = "unknown", "missing_min_max_stats"
+                min_v, max_v = None, None
+                nulls = None
+            else:
+                min_v, max_v = st.min, st.max
+                nulls = getattr(st, "null_count", None)
+                status, reason = _eval_predicate(min_v, max_v, args.predicate, v1, v2)
+
+            if status == "possible":
+                file_possible += 1
+            elif status == "impossible":
+                file_impossible += 1
+            else:
+                file_unknown += 1
+
+            if args.only_possible and status != "possible":
+                continue
+
+            print(
+                f"  rg={rg_i:04d} rows={rows:<8} status={status:<10} "
+                f"min={to_text(min_v):<30} max={to_text(max_v):<30} nulls={to_text(nulls)}"
+            )
+            if args.show_reason:
+                print(f"    reason: {reason}")
+
+        file_total = pf.metadata.num_row_groups
+        overall_possible += file_possible
+        overall_impossible += file_impossible
+        overall_unknown += file_unknown
+        overall_total += file_total
+        print(
+            f"  file_summary: possible={file_possible}, impossible={file_impossible}, "
+            f"unknown={file_unknown}, total={file_total}"
+        )
+        print("")
+
+    print(
+        f"overall_summary: possible={overall_possible}, impossible={overall_impossible}, "
+        f"unknown={overall_unknown}, total={overall_total}"
+    )
+    return 0
+
+
 def run_cmd_inspect(args: argparse.Namespace) -> int:
     hoodie_dir = Path(args.hoodie_dir).resolve()
     if hoodie_dir.name != ".hoodie":
@@ -831,6 +1108,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_foot.add_argument("--limit-files", type=int, default=30)
     p_foot.add_argument("--format", choices=["text", "json"], default="text")
     p_foot.set_defaults(func=run_cmd_footer_minmax)
+
+    p_rg = sub.add_parser("rowgroup-check", help="Pick a parquet file and evaluate row-group predicate possibility")
+    p_rg.add_argument("--table-root", default="data/amazon/hudi_user_time/hudi_linear")
+    p_rg.add_argument("--partition", default=None, help="Restrict file selection to this partition directory")
+    p_rg.add_argument("--file", default=None, help="Specific parquet file path (absolute or relative to table-root)")
+    p_rg.add_argument("--seed", type=int, default=None, help="Random seed when selecting a random parquet file")
+    p_rg.add_argument("--all-files", action="store_true", help="Scan all valid parquet files in scope (not just one random file)")
+    p_rg.add_argument("--max-files", type=int, default=None, help="Limit number of files when --all-files is set")
+    p_rg.add_argument("--column", required=True, help="Column name to inspect in row-group stats")
+    p_rg.add_argument(
+        "--predicate",
+        choices=["none", "eq", "gt", "ge", "lt", "le", "between", "prefix"],
+        default="none",
+        help="Predicate tested against row-group min/max",
+    )
+    p_rg.add_argument("--value", default=None, help="Predicate value (or prefix for --predicate prefix)")
+    p_rg.add_argument("--value2", default=None, help="Second value for --predicate between")
+    p_rg.add_argument("--only-possible", action="store_true", help="Only print row groups with status=possible")
+    p_rg.add_argument("--show-reason", action="store_true", help="Print rule explanation per row group")
+    p_rg.set_defaults(func=run_cmd_rowgroup_check)
 
     p_md = sub.add_parser("metadata-minmax", help="Read Hudi metadata table column_stats min/max")
     p_md.add_argument("--table-root", default="data/amazon/hudi_user_time/hudi_linear")
